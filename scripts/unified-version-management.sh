@@ -22,12 +22,12 @@ CHANGELOG_FILE="$PROJECT_ROOT/CHANGELOG.md"
 # 微服务列表
 MICROSERVICES=(
     "auth-service-go:8207"
-    "user-service:8082"
-    "job-service:8084"
-    "resume-service:8085"
-    "company-service:8083"
+    "microservices/user-service:8082"
+    "microservices/job-service:8084"
+    "microservices/resume-service:8085"
+    "microservices/company-service:8083"
     "ai-service-python:8100"
-    "blockchain-service:8208"
+    "microservices/blockchain-service:8208"
 )
 
 # 前端服务
