@@ -21,12 +21,12 @@ CHANGELOG_FILE="$PROJECT_ROOT/CHANGELOG.md"
 
 # 微服务列表
 MICROSERVICES=(
-    "auth-service:8207"
+    "auth-service-go:8207"
     "user-service:8082"
     "job-service:8084"
     "resume-service:8085"
     "company-service:8083"
-    "ai-service:8100"
+    "ai-service-python:8100"
     "blockchain-service:8208"
 )
 
@@ -137,7 +137,7 @@ update_microservice_versions() {
         log_info "更新 $service_name 服务版本..."
         
         # 更新服务目录中的版本信息
-        local service_dir="$PROJECT_ROOT/src/microservices/$service_name"
+        local service_dir="$PROJECT_ROOT/src/$service_name"
         if [ -d "$service_dir" ]; then
             # 更新go.mod版本
             if [ -f "$service_dir/go.mod" ]; then
@@ -222,7 +222,7 @@ EOF
     for service in "${MICROSERVICES[@]}"; do
         local service_name=$(echo $service | cut -d':' -f1)
         local service_port=$(echo $service | cut -d':' -f2)
-        local service_dir="$PROJECT_ROOT/src/microservices/$service_name"
+        local service_dir="$PROJECT_ROOT/src/$service_name"
         
         if [ -d "$service_dir" ]; then
             echo "| $service_name | $service_port | $version | ✅ 已更新 |" >> "$report_file"
@@ -303,7 +303,7 @@ verify_version_consistency() {
     # 检查微服务版本
     for service in "${MICROSERVICES[@]}"; do
         local service_name=$(echo $service | cut -d':' -f1)
-        local service_dir="$PROJECT_ROOT/src/microservices/$service_name"
+        local service_dir="$PROJECT_ROOT/src/$service_name"
         
         if [ -f "$service_dir/.version" ]; then
             local service_version=$(grep "version:" "$service_dir/.version" | cut -d' ' -f2)
