@@ -1,0 +1,196 @@
+syntax = "v1"
+
+info (
+	title:   "AI服务API"
+	desc:    "AI智能匹配、简历分析、AI聊天等接口"
+	author:  "Zervigo Team"
+	version: "v1.0.0"
+)
+
+type (
+	// AI匹配请求
+	AIMatchRequest {
+		ResumeId   int64                  `json:"resume_id"`
+		JobId      int64                  `json:"job_id,optional"`
+		MatchType  string                 `json:"match_type"` // "resume_job", "job_resume", "smart_recommend"
+		Parameters map[string]interface{} `json:"parameters,optional"`
+	}
+	// AI匹配响应
+	AIMatchResponse {
+		MatchId         int64            `json:"match_id"`
+		MatchScore      float64          `json:"match_score"`
+		MatchDetails    MatchDetails     `json:"match_details"`
+		Recommendations []Recommendation `json:"recommendations"`
+		Analysis        AnalysisResult   `json:"analysis"`
+	}
+	// 匹配详情
+	MatchDetails {
+		SkillsMatch     float64 `json:"skills_match"`
+		ExperienceMatch float64 `json:"experience_match"`
+		EducationMatch  float64 `json:"education_match"`
+		LocationMatch   float64 `json:"location_match"`
+		SalaryMatch     float64 `json:"salary_match"`
+		CultureMatch    float64 `json:"culture_match"`
+	}
+	// 推荐结果
+	Recommendation {
+		Type        string `json:"type"` // "skill", "experience", "education", "location"
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Priority    int    `json:"priority"`
+		Action      string `json:"action"`
+	}
+	// 分析结果
+	AnalysisResult {
+		Strengths   []string `json:"strengths"`
+		Weaknesses  []string `json:"weaknesses"`
+		Suggestions []string `json:"suggestions"`
+		RiskFactors []string `json:"risk_factors"`
+	}
+	// 简历分析请求
+	ResumeAnalysisRequest {
+		ResumeId     int64  `json:"resume_id"`
+		AnalysisType string `json:"analysis_type"` // "comprehensive", "skills", "experience", "education"
+		JobId        int64  `json:"job_id,optional"`
+	}
+	// 简历分析响应
+	ResumeAnalysisResponse {
+		AnalysisId         int64              `json:"analysis_id"`
+		ResumeId           int64              `json:"resume_id"`
+		AnalysisType       string             `json:"analysis_type"`
+		AnalysisResult     AnalysisResult     `json:"analysis_result"`
+		SkillsAnalysis     SkillsAnalysis     `json:"skills_analysis"`
+		ExperienceAnalysis ExperienceAnalysis `json:"experience_analysis"`
+		EducationAnalysis  EducationAnalysis  `json:"education_analysis"`
+		OverallScore       float64            `json:"overall_score"`
+		CreateTime         int64              `json:"create_time"`
+	}
+	// 技能分析
+	SkillsAnalysis {
+		TechnicalSkills      []SkillScore `json:"technical_skills"`
+		SoftSkills           []SkillScore `json:"soft_skills"`
+		SkillGaps            []SkillGap   `json:"skill_gaps"`
+		SkillRecommendations []string     `json:"skill_recommendations"`
+	}
+	// 技能评分
+	SkillScore {
+		SkillName  string  `json:"skill_name"`
+		SkillLevel string  `json:"skill_level"`
+		Score      float64 `json:"score"`
+		Confidence float64 `json:"confidence"`
+	}
+	// 技能差距
+	SkillGap {
+		SkillName     string  `json:"skill_name"`
+		RequiredLevel string  `json:"required_level"`
+		CurrentLevel  string  `json:"current_level"`
+		GapScore      float64 `json:"gap_score"`
+		Importance    string  `json:"importance"`
+	}
+	// 经验分析
+	ExperienceAnalysis {
+		TotalExperience    float64              `json:"total_experience"`
+		RelevantExperience float64              `json:"relevant_experience"`
+		ExperienceQuality  float64              `json:"experience_quality"`
+		CareerProgression  string               `json:"career_progression"`
+		IndustryExperience []IndustryExperience `json:"industry_experience"`
+	}
+	// 行业经验
+	IndustryExperience {
+		Industry   string  `json:"industry"`
+		Experience float64 `json:"experience"`
+		Relevance  float64 `json:"relevance"`
+	}
+	// 教育分析
+	EducationAnalysis {
+		EducationLevel   string   `json:"education_level"`
+		EducationQuality float64  `json:"education_quality"`
+		Relevance        float64  `json:"relevance"`
+		EducationGaps    []string `json:"education_gaps"`
+	}
+	// AI聊天请求
+	AIChatRequest {
+		Message   string `json:"message"`
+		Context   string `json:"context,optional"`
+		UserId    int64  `json:"user_id"`
+		ChatType  string `json:"chat_type"` // "general", "resume", "job", "career"
+		SessionId string `json:"session_id,optional"`
+	}
+	// AI聊天响应
+	AIChatResponse {
+		ResponseId   int64        `json:"response_id"`
+		Message      string       `json:"message"`
+		ResponseType string       `json:"response_type"` // "text", "suggestion", "action"
+		Suggestions  []string     `json:"suggestions,optional"`
+		Actions      []ChatAction `json:"actions,optional"`
+		SessionId    string       `json:"session_id"`
+		Timestamp    int64        `json:"timestamp"`
+	}
+	// 聊天动作
+	ChatAction {
+		ActionType  string                 `json:"action_type"` // "navigate", "create", "update", "search"
+		ActionData  map[string]interface{} `json:"action_data"`
+		Description string                 `json:"description"`
+	}
+	// 智能推荐请求
+	SmartRecommendRequest {
+		UserId        int64                  `json:"user_id"`
+		RecommendType string                 `json:"recommend_type"` // "jobs", "resumes", "companies", "skills"
+		Limit         int                    `json:"limit,default=10"`
+		Filters       map[string]interface{} `json:"filters,optional"`
+	}
+	// 智能推荐响应
+	SmartRecommendResponse {
+		Recommendations []RecommendationItem `json:"recommendations"`
+		Total           int                  `json:"total"`
+		Algorithm       string               `json:"algorithm"`
+		Confidence      float64              `json:"confidence"`
+	}
+	// 推荐项目
+	RecommendationItem {
+		ItemId      int64                  `json:"item_id"`
+		ItemType    string                 `json:"item_type"`
+		Title       string                 `json:"title"`
+		Description string                 `json:"description"`
+		Score       float64                `json:"score"`
+		Reasons     []string               `json:"reasons"`
+		Metadata    map[string]interface{} `json:"metadata"`
+	}
+	// 通用响应
+	Response {
+		Code    int         `json:"code"`
+		Message string      `json:"message"`
+		Data    interface{} `json:"data,omitempty"`
+	}
+)
+
+@server (
+	group:      ai
+	middleware: Auth
+)
+service ai-api {
+	@handler matchResumeJob
+	post /api/v1/ai/match (AIMatchRequest) returns (AIMatchResponse)
+
+	@handler analyzeResume
+	post /api/v1/ai/resume/analyze (ResumeAnalysisRequest) returns (ResumeAnalysisResponse)
+
+	@handler chat
+	post /api/v1/ai/chat (AIChatRequest) returns (AIChatResponse)
+
+	@handler smartRecommend
+	post /api/v1/ai/recommend (SmartRecommendRequest) returns (SmartRecommendResponse)
+
+	@handler getMatchHistory
+	get /api/v1/ai/match/history/:userId returns ([]AIMatchResponse)
+
+	@handler getAnalysisHistory
+	get /api/v1/ai/analysis/history/:userId returns ([]ResumeAnalysisResponse)
+
+	@handler getChatHistory
+	get /api/v1/ai/chat/history/:sessionId returns ([]AIChatResponse)
+
+	@handler healthCheck
+	get /api/v1/ai/health returns (Response)
+}
+

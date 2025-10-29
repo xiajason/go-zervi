@@ -1,0 +1,181 @@
+syntax = "proto3";
+
+package resume;
+option go_package = "./resume";
+
+// 简历信息
+message Resume {
+    int64 resume_id = 1;
+    int64 user_id = 2;
+    string resume_name = 3;
+    PersonalInfo personal_info = 4;
+    repeated WorkExperience work_experience = 5;
+    repeated Education education = 6;
+    repeated Skill skills = 7;
+    repeated Project projects = 8;
+    repeated Certificate certificates = 9;
+    int32 status = 10;
+    int64 create_time = 11;
+    int64 update_time = 12;
+}
+
+// 个人信息
+message PersonalInfo {
+    string real_name = 1;
+    string email = 2;
+    string phone = 3;
+    int32 gender = 4;
+    string birthday = 5;
+    string location = 6;
+    string bio = 7;
+    string avatar = 8;
+}
+
+// 工作经历
+message WorkExperience {
+    int64 experience_id = 1;
+    string company_name = 2;
+    string position = 3;
+    string start_date = 4;
+    string end_date = 5;
+    string description = 6;
+    repeated string achievements = 7;
+}
+
+// 教育经历
+message Education {
+    int64 education_id = 1;
+    string school_name = 2;
+    string major = 3;
+    string degree = 4;
+    string start_date = 5;
+    string end_date = 6;
+    string description = 7;
+}
+
+// 技能
+message Skill {
+    int64 skill_id = 1;
+    string skill_name = 2;
+    string skill_level = 3;
+    string category = 4;
+}
+
+// 项目经历
+message Project {
+    int64 project_id = 1;
+    string project_name = 2;
+    string project_description = 3;
+    string start_date = 4;
+    string end_date = 5;
+    repeated string technologies = 6;
+    repeated string responsibilities = 7;
+}
+
+// 证书
+message Certificate {
+    int64 certificate_id = 1;
+    string certificate_name = 2;
+    string issuing_organization = 3;
+    string issue_date = 4;
+    string expiry_date = 5;
+    string certificate_url = 6;
+}
+
+// 创建简历请求
+message CreateResumeRequest {
+    int64 user_id = 1;
+    string resume_name = 2;
+    PersonalInfo personal_info = 3;
+    repeated WorkExperience work_experience = 4;
+    repeated Education education = 5;
+    repeated Skill skills = 6;
+    repeated Project projects = 7;
+    repeated Certificate certificates = 8;
+}
+
+// 创建简历响应
+message CreateResumeResponse {
+    int64 resume_id = 1;
+    bool success = 2;
+    string message = 3;
+}
+
+// 更新简历请求
+message UpdateResumeRequest {
+    int64 resume_id = 1;
+    string resume_name = 2;
+    PersonalInfo personal_info = 3;
+    repeated WorkExperience work_experience = 4;
+    repeated Education education = 5;
+    repeated Skill skills = 6;
+    repeated Project projects = 7;
+    repeated Certificate certificates = 8;
+    int32 status = 9;
+}
+
+// 更新简历响应
+message UpdateResumeResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// 获取简历请求
+message GetResumeRequest {
+    int64 resume_id = 1;
+}
+
+// 获取简历响应
+message GetResumeResponse {
+    Resume resume = 1;
+}
+
+// 获取用户简历列表请求
+message GetUserResumesRequest {
+    int64 user_id = 1;
+}
+
+// 获取用户简历列表响应
+message GetUserResumesResponse {
+    repeated Resume resumes = 1;
+}
+
+// 简历分析请求
+message AnalyzeResumeRequest {
+    int64 resume_id = 1;
+    int64 job_id = 2;
+}
+
+// 简历分析响应
+message AnalyzeResumeResponse {
+    float64 match_score = 1;
+    repeated string strengths = 2;
+    repeated string weaknesses = 3;
+    repeated string suggestions = 4;
+    repeated string skills_match = 5;
+    repeated string skills_missing = 6;
+}
+
+// 空响应
+message Empty {}
+
+// 简历服务
+service Resume {
+    // 创建简历
+    rpc CreateResume(CreateResumeRequest) returns(CreateResumeResponse);
+    
+    // 获取简历
+    rpc GetResume(GetResumeRequest) returns(GetResumeResponse);
+    
+    // 更新简历
+    rpc UpdateResume(UpdateResumeRequest) returns(UpdateResumeResponse);
+    
+    // 删除简历
+    rpc DeleteResume(GetResumeRequest) returns(Empty);
+    
+    // 获取用户简历列表
+    rpc GetUserResumes(GetUserResumesRequest) returns(GetUserResumesResponse);
+    
+    // 分析简历
+    rpc AnalyzeResume(AnalyzeResumeRequest) returns(AnalyzeResumeResponse);
+}

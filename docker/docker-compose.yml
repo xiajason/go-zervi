@@ -1,0 +1,266 @@
+version: '3.8'
+
+# Zervigo MVP 微服务架构
+# 基于Go语言的中央大脑 + 多微服务架构
+
+services:
+  # ==================== 基础设施服务 ====================
+  
+  # PostgreSQL数据库 (主要数据库)
+  postgres:
+    image: postgres:15-alpine
+    container_name: zervigo-postgres-mvp
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zervigo_mvp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_mvp_data:/var/lib/postgresql/data
+      - ./databases/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - zervigo-mvp
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d zervigo_mvp"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: zervigo-redis-mvp
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_mvp_data:/data
+    networks:
+      - zervigo-mvp
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Consul服务发现
+  consul:
+    image: consul:1.16
+    container_name: zervigo-consul-mvp
+    restart: unless-stopped
+    ports:
+      - "8500:8500"
+    volumes:
+      - consul_mvp_data:/consul/data
+    networks:
+      - zervigo-mvp
+    command: consul agent -server -bootstrap-expect=1 -data-dir=/consul/data -ui -client=0.0.0.0
+
+  # ==================== 核心微服务 ====================
+  
+  # 中央大脑 (API Gateway)
+  central-brain:
+    build:
+      context: ./src/central-brain
+      dockerfile: Dockerfile
+    container_name: zervigo-central-brain-mvp
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      - CENTRAL_BRAIN_PORT=9000
+      - AUTH_SERVICE_PORT=8207
+      - AI_SERVICE_PORT=8100
+      - BLOCKCHAIN_SERVICE_PORT=8208
+      - USER_SERVICE_PORT=8082
+      - JOB_SERVICE_PORT=8084
+      - RESUME_SERVICE_PORT=8085
+      - COMPANY_SERVICE_PORT=8083
+    networks:
+      - zervigo-mvp
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+
+  # 认证服务
+  auth-service:
+    build:
+      context: ./src/auth-service
+      dockerfile: Dockerfile
+    container_name: zervigo-auth-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8207:8207"
+    environment:
+      - AUTH_SERVICE_PORT=8207
+      - DATABASE_URL=root:dev_password@tcp(mysql:3306)/zervigo_mvp?charset=utf8mb4&parseTime=True&loc=Local
+      - JWT_SECRET=zervigo-mvp-secret-key-2025
+    networks:
+      - zervigo-mvp
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 256m
+    cpus: 0.5
+
+  # AI服务
+  ai-service:
+    build:
+      context: ./src/ai-service
+      dockerfile: Dockerfile
+    container_name: zervigo-ai-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8100:8100"
+    environment:
+      - AI_SERVICE_PORT=8100
+      - AUTH_SERVICE_URL=http://auth-service:8207
+      - DATABASE_URL=root:dev_password@tcp(mysql:3306)/zervigo_mvp?charset=utf8mb4&parseTime=True&loc=Local
+    networks:
+      - zervigo-mvp
+    depends_on:
+      auth-service:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+    mem_limit: 1g
+    cpus: 2.0
+
+  # 区块链服务
+  blockchain-service:
+    build:
+      context: ./src/blockchain-service
+      dockerfile: Dockerfile
+    container_name: zervigo-blockchain-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8208:8208"
+    environment:
+      - BLOCKCHAIN_SERVICE_PORT=8208
+      - DATABASE_URL=root:dev_password@tcp(mysql:3306)/zervigo_mvp?charset=utf8mb4&parseTime=True&loc=Local
+      - JWT_SECRET=zervigo-mvp-secret-key-2025
+    networks:
+      - zervigo-mvp
+    depends_on:
+      mysql:
+        condition: service_healthy
+    mem_limit: 256m
+    cpus: 0.5
+
+  # 用户服务
+  user-service:
+    build:
+      context: ./src/user-service
+      dockerfile: Dockerfile
+    container_name: zervigo-user-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - USER_SERVICE_PORT=8082
+      - DATABASE_URL=root:dev_password@tcp(mysql:3306)/zervigo_mvp?charset=utf8mb4&parseTime=True&loc=Local
+      - AUTH_SERVICE_URL=http://auth-service:8207
+    networks:
+      - zervigo-mvp
+    depends_on:
+      auth-service:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+    mem_limit: 256m
+    cpus: 0.5
+
+  # 职位服务
+  job-service:
+    build:
+      context: ./src/job-service
+      dockerfile: Dockerfile
+    container_name: zervigo-job-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      - JOB_SERVICE_PORT=8084
+      - DATABASE_URL=root:dev_password@tcp(mysql:3306)/zervigo_mvp?charset=utf8mb4&parseTime=True&loc=Local
+      - AUTH_SERVICE_URL=http://auth-service:8207
+    networks:
+      - zervigo-mvp
+    depends_on:
+      auth-service:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+    mem_limit: 256m
+    cpus: 0.5
+
+  # 简历服务
+  resume-service:
+    build:
+      context: ./src/resume-service
+      dockerfile: Dockerfile
+    container_name: zervigo-resume-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      - RESUME_SERVICE_PORT=8085
+      - DATABASE_URL=root:dev_password@tcp(mysql:3306)/zervigo_mvp?charset=utf8mb4&parseTime=True&loc=Local
+      - AUTH_SERVICE_URL=http://auth-service:8207
+      - AI_SERVICE_URL=http://ai-service:8100
+      - BLOCKCHAIN_SERVICE_URL=http://blockchain-service:8208
+    networks:
+      - zervigo-mvp
+    depends_on:
+      auth-service:
+        condition: service_started
+      ai-service:
+        condition: service_started
+      blockchain-service:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+
+  # 企业服务
+  company-service:
+    build:
+      context: ./src/company-service
+      dockerfile: Dockerfile
+    container_name: zervigo-company-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      - COMPANY_SERVICE_PORT=8083
+      - DATABASE_URL=root:dev_password@tcp(mysql:3306)/zervigo_mvp?charset=utf8mb4&parseTime=True&loc=Local
+      - AUTH_SERVICE_URL=http://auth-service:8207
+    networks:
+      - zervigo-mvp
+    depends_on:
+      auth-service:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+    mem_limit: 256m
+    cpus: 0.5
+
+networks:
+  zervigo-mvp:
+    driver: bridge
+
+volumes:
+  mysql_mvp_data:
+  redis_mvp_data:
+  consul_mvp_data:

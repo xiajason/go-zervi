@@ -1,0 +1,459 @@
+version: '3.8'
+
+# Zervigo 微服务架构 Docker Compose 配置
+# 包含所有微服务的完整开发环境
+
+services:
+  # ==================== 基础设施服务 ====================
+  
+  # MySQL - 核心关系数据库
+  mysql:
+    image: mysql:8.0
+    container_name: zervigo-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: dev_password
+      MYSQL_DATABASE: jobfirst
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: 
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    networks:
+      - zervigo-net
+    mem_limit: 1g
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pdev_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # PostgreSQL - 向量存储
+  postgres:
+    image: postgres:14
+    container_name: zervigo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: jobfirst_vector
+      POSTGRES_USER: postgres
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - zervigo-net
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Redis - 缓存
+  redis:
+    image: redis:6-alpine
+    container_name: zervigo-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - zervigo-net
+    mem_limit: 256m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ==================== 核心服务 ====================
+  
+  # 统一认证服务
+  auth-service:
+    build:
+      context: ./src/auth-service-go
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-auth-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "root:dev_password@tcp(mysql:3306)/jobfirst?charset=utf8mb4&parseTime=True&loc=Local"
+      JWT_SECRET: "jobfirst-unified-auth-secret-key-2024"
+      AUTH_SERVICE_PORT: 8207
+    ports:
+      - "8207:8207"
+    volumes:
+      - ./src/auth-service-go:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      mysql:
+        condition: service_healthy
+    mem_limit: 256m
+    cpus: 0.5
+
+  # API网关
+  api-gateway:
+    build:
+      context: ./src/microservices/api-gateway
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-api-gateway
+    restart: unless-stopped
+    environment:
+      AUTH_SERVICE_URL: "http://auth-service:8207"
+      API_GATEWAY_PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./src/microservices/api-gateway:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+    mem_limit: 256m
+    cpus: 0.5
+
+  # 基础服务
+  basic-server:
+    build:
+      context: ./src/microservices/basic-server
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-basic-server
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "root:dev_password@tcp(mysql:3306)/jobfirst?charset=utf8mb4&parseTime=True&loc=Local"
+      AUTH_SERVICE_URL: "http://auth-service:8207"
+      BASIC_SERVER_PORT: 8081
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./src/microservices/basic-server:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+    mem_limit: 256m
+    cpus: 0.5
+
+  # ==================== 业务微服务 ====================
+  
+  # 用户服务
+  user-service:
+    build:
+      context: ./src/microservices/user-service
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-user-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "root:dev_password@tcp(mysql:3306)/jobfirst?charset=utf8mb4&parseTime=True&loc=Local"
+      AUTH_SERVICE_URL: "http://auth-service:8207"
+      USER_SERVICE_PORT: 8082
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./src/microservices/user-service:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+    mem_limit: 256m
+    cpus: 0.5
+
+  # 公司服务
+  company-service:
+    build:
+      context: ./src/microservices/company-service
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-company-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "root:dev_password@tcp(mysql:3306)/jobfirst?charset=utf8mb4&parseTime=True&loc=Local"
+      AUTH_SERVICE_URL: "http://auth-service:8207"
+      COMPANY_SERVICE_PORT: 8083
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./src/microservices/company-service:/app
+      - ./src/microservices/company-service/uploads:/app/uploads
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+    mem_limit: 512m
+    cpus: 1.0
+
+  # 职位服务
+  job-service:
+    build:
+      context: ./src/microservices/job-service
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-job-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "root:dev_password@tcp(mysql:3306)/jobfirst?charset=utf8mb4&parseTime=True&loc=Local"
+      AUTH_SERVICE_URL: "http://auth-service:8207"
+      JOB_SERVICE_PORT: 8084
+    ports:
+      - "8084:8084"
+    volumes:
+      - ./src/microservices/job-service:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+    mem_limit: 512m
+    cpus: 1.0
+
+  # 简历服务
+  resume-service:
+    build:
+      context: ./src/microservices/resume-service
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-resume-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "root:dev_password@tcp(mysql:3306)/jobfirst?charset=utf8mb4&parseTime=True&loc=Local"
+      AUTH_SERVICE_URL: "http://auth-service:8207"
+      RESUME_SERVICE_PORT: 8085
+    ports:
+      - "8085:8085"
+    volumes:
+      - ./src/microservices/resume-service:/app
+      - ./src/microservices/resume-service/uploads:/app/uploads
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+    mem_limit: 512m
+    cpus: 1.0
+
+  # 通知服务
+  notification-service:
+    build:
+      context: ./src/microservices/notification-service
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-notification-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "root:dev_password@tcp(mysql:3306)/jobfirst?charset=utf8mb4&parseTime=True&loc=Local"
+      REDIS_URL: "redis:6379"
+      AUTH_SERVICE_URL: "http://auth-service:8207"
+      NOTIFICATION_SERVICE_PORT: 8086
+    ports:
+      - "8086:8086"
+    volumes:
+      - ./src/microservices/notification-service:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    mem_limit: 256m
+    cpus: 0.5
+
+  # 横幅服务
+  banner-service:
+    build:
+      context: ./src/microservices/banner-service
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-banner-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "root:dev_password@tcp(mysql:3306)/jobfirst?charset=utf8mb4&parseTime=True&loc=Local"
+      AUTH_SERVICE_URL: "http://auth-service:8207"
+      BANNER_SERVICE_PORT: 8087
+    ports:
+      - "8087:8087"
+    volumes:
+      - ./src/microservices/banner-service:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+    mem_limit: 256m
+    cpus: 0.5
+
+  # 模板服务
+  template-service:
+    build:
+      context: ./src/microservices/template-service
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-template-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "root:dev_password@tcp(mysql:3306)/jobfirst?charset=utf8mb4&parseTime=True&loc=Local"
+      AUTH_SERVICE_URL: "http://auth-service:8207"
+      TEMPLATE_SERVICE_PORT: 8088
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./src/microservices/template-service:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+    mem_limit: 256m
+    cpus: 0.5
+
+  # 统计服务
+  statistics-service:
+    build:
+      context: ./src/microservices/statistics-service
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-statistics-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "root:dev_password@tcp(mysql:3306)/jobfirst?charset=utf8mb4&parseTime=True&loc=Local"
+      REDIS_URL: "redis:6379"
+      AUTH_SERVICE_URL: "http://auth-service:8207"
+      STATISTICS_SERVICE_PORT: 8089
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./src/microservices/statistics-service:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+
+  # 开发团队服务
+  dev-team-service:
+    build:
+      context: ./src/microservices/dev-team-service
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-dev-team-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "root:dev_password@tcp(mysql:3306)/jobfirst?charset=utf8mb4&parseTime=True&loc=Local"
+      AUTH_SERVICE_URL: "http://auth-service:8207"
+      DEV_TEAM_SERVICE_PORT: 8090
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./src/microservices/dev-team-service:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+    mem_limit: 256m
+    cpus: 0.5
+
+  # 多数据库服务
+  multi-database-service:
+    build:
+      context: ./src/microservices/multi-database-service
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-multi-database-service
+    restart: unless-stopped
+    environment:
+      MYSQL_URL: "root:dev_password@tcp(mysql:3306)/jobfirst?charset=utf8mb4&parseTime=True&loc=Local"
+      POSTGRES_URL: "postgres://postgres:dev_password@postgres:5432/jobfirst_vector"
+      REDIS_URL: "redis:6379"
+      AUTH_SERVICE_URL: "http://auth-service:8207"
+      MULTI_DATABASE_SERVICE_PORT: 8091
+    ports:
+      - "8091:8091"
+    volumes:
+      - ./src/microservices/multi-database-service:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+
+  # AI服务 (Python)
+  ai-service:
+    build:
+      context: ./src/ai-service-python
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-ai-service
+    restart: unless-stopped
+    environment:
+      ZERVIGO_AUTH_URL: "http://auth-service:8207"
+      AI_SERVICE_PORT: 8100
+      POSTGRES_HOST: "postgres"
+      POSTGRES_USER: "postgres"
+      POSTGRES_DB: "jobfirst_vector"
+      POSTGRES_PASSWORD: "dev_password"
+      MYSQL_HOST: "mysql"
+      MYSQL_USER: "root"
+      MYSQL_PASSWORD: "dev_password"
+      MYSQL_DATABASE: "jobfirst"
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./src/ai-service-python:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      auth-service:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    mem_limit: 1g
+    cpus: 2.0
+
+  # 区块链服务 (Go)
+  blockchain-service:
+    build:
+      context: ./src/microservices/blockchain-service
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-blockchain-service
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "root:dev_password@tcp(mysql:3306)/zervigo_blockchain?charset=utf8mb4&parseTime=True&loc=Local"
+      JWT_SECRET: "jobfirst-unified-auth-secret-key-2024"
+      BLOCKCHAIN_SERVICE_PORT: 8208
+    ports:
+      - "8208:8208"
+    volumes:
+      - ./src/microservices/blockchain-service:/app
+    networks:
+      - zervigo-net
+    depends_on:
+      mysql:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+
+volumes:
+  mysql_data:
+  postgres_data:
+  redis_data:
+
+networks:
+  zervigo-net:
+    driver: bridge
