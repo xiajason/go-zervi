@@ -1,0 +1,165 @@
+syntax = "proto3";
+
+package company;
+option go_package = "./company";
+
+// 企业信息
+message Company {
+    int64 company_id = 1;
+    string company_name = 2;
+    string company_logo = 3;
+    string company_description = 4;
+    string industry = 5;
+    string company_size = 6;
+    string website = 7;
+    string address = 8;
+    string city = 9;
+    string province = 10;
+    string country = 11;
+    string contact_person = 12;
+    string contact_phone = 13;
+    string contact_email = 14;
+    int32 status = 15;
+    int32 verification_status = 16;
+    int64 create_time = 17;
+    int64 update_time = 18;
+}
+
+// 创建企业请求
+message CreateCompanyRequest {
+    string company_name = 1;
+    string company_logo = 2;
+    string company_description = 3;
+    string industry = 4;
+    string company_size = 5;
+    string website = 6;
+    string address = 7;
+    string city = 8;
+    string province = 9;
+    string country = 10;
+    string contact_person = 11;
+    string contact_phone = 12;
+    string contact_email = 13;
+}
+
+// 创建企业响应
+message CreateCompanyResponse {
+    int64 company_id = 1;
+    bool success = 2;
+    string message = 3;
+}
+
+// 更新企业请求
+message UpdateCompanyRequest {
+    int64 company_id = 1;
+    string company_name = 2;
+    string company_logo = 3;
+    string company_description = 4;
+    string industry = 5;
+    string company_size = 6;
+    string website = 7;
+    string address = 8;
+    string city = 9;
+    string province = 10;
+    string country = 11;
+    string contact_person = 12;
+    string contact_phone = 13;
+    string contact_email = 14;
+    int32 status = 15;
+}
+
+// 更新企业响应
+message UpdateCompanyResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// 获取企业请求
+message GetCompanyRequest {
+    int64 company_id = 1;
+}
+
+// 获取企业响应
+message GetCompanyResponse {
+    Company company = 1;
+}
+
+// 企业搜索请求
+message CompanySearchRequest {
+    string keyword = 1;
+    string industry = 2;
+    string company_size = 3;
+    string city = 4;
+    string province = 5;
+    int32 status = 6;
+    int32 page = 7;
+    int32 page_size = 8;
+}
+
+// 企业搜索响应
+message CompanySearchResponse {
+    repeated Company companies = 1;
+    int64 total = 2;
+    int32 page = 3;
+    int32 page_size = 4;
+}
+
+// 企业认证请求
+message CompanyVerificationRequest {
+    int64 company_id = 1;
+    string business_license = 2;
+    string tax_number = 3;
+    string legal_person = 4;
+    string legal_person_id = 5;
+    repeated string verification_documents = 6;
+}
+
+// 企业认证响应
+message CompanyVerificationResponse {
+    int64 verification_id = 1;
+    string status = 2;
+    string message = 3;
+    int64 submit_time = 4;
+}
+
+// 企业统计请求
+message CompanyStatsRequest {
+    int64 start_time = 1;
+    int64 end_time = 2;
+}
+
+// 企业统计响应
+message CompanyStatsResponse {
+    int64 total_companies = 1;
+    int64 verified_companies = 2;
+    int64 active_companies = 3;
+    int64 new_companies_today = 4;
+    int64 new_companies_this_month = 5;
+}
+
+// 空响应
+message Empty {}
+
+// 企业服务
+service Company {
+    // 创建企业
+    rpc CreateCompany(CreateCompanyRequest) returns(CreateCompanyResponse);
+    
+    // 获取企业
+    rpc GetCompany(GetCompanyRequest) returns(GetCompanyResponse);
+    
+    // 更新企业
+    rpc UpdateCompany(UpdateCompanyRequest) returns(UpdateCompanyResponse);
+    
+    // 删除企业
+    rpc DeleteCompany(GetCompanyRequest) returns(Empty);
+    
+    // 搜索企业
+    rpc SearchCompanies(CompanySearchRequest) returns(CompanySearchResponse);
+    
+    // 企业认证
+    rpc VerifyCompany(CompanyVerificationRequest) returns(CompanyVerificationResponse);
+    
+    // 获取企业统计
+    rpc GetCompanyStats(CompanyStatsRequest) returns(CompanyStatsResponse);
+}

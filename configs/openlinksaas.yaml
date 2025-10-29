@@ -1,0 +1,275 @@
+# OpenLinkSaaS 集成配置文件
+
+# 版本管理配置
+version_management:
+  # 当前项目版本
+  current_version: "1.0.0"
+  
+  # 版本策略
+  versioning_strategy: "semantic"
+  
+  # 微服务版本映射
+  microservices:
+    auth-service:
+      version: "1.0.0"
+      port: 8207
+      git_repo: "src/auth-service-go"
+      docker_image: "zervigo-auth-service"
+    
+    user-service:
+      version: "1.0.0"
+      port: 8082
+      git_repo: "src/microservices/user-service"
+      docker_image: "zervigo-user-service"
+    
+    job-service:
+      version: "1.0.0"
+      port: 8084
+      git_repo: "src/microservices/job-service"
+      docker_image: "zervigo-job-service"
+    
+    resume-service:
+      version: "1.0.0"
+      port: 8085
+      git_repo: "src/microservices/resume-service"
+      docker_image: "zervigo-resume-service"
+    
+    company-service:
+      version: "1.0.0"
+      port: 8083
+      git_repo: "src/microservices/company-service"
+      docker_image: "zervigo-company-service"
+    
+    ai-service:
+      version: "1.0.0"
+      port: 8100
+      git_repo: "src/ai-service-python"
+      docker_image: "zervigo-ai-service"
+    
+    blockchain-service:
+      version: "1.0.0"
+      port: 8208
+      git_repo: "src/microservices/blockchain-service"
+      docker_image: "zervigo-blockchain-service"
+
+# 前端配置
+frontend:
+  version: "1.0.0"
+  framework: "taro"
+  build_targets: ["weapp", "h5", "rn"]
+  git_repo: "frontend"
+
+# 基础设施配置
+infrastructure:
+  version: "1.0.0"
+  services:
+    basic-server:
+      port: 8080
+      git_repo: "src/microservices/basic-server"
+    
+    api-gateway:
+      port: 8080
+      git_repo: "src/microservices/api-gateway"
+    
+    consul:
+      port: 8500
+      type: "service_discovery"
+    
+    mysql:
+      port: 3306
+      type: "database"
+    
+    postgres:
+      port: 5432
+      type: "database"
+    
+    redis:
+      port: 6379
+      type: "cache"
+
+# Git配置
+git:
+  # 主仓库
+  main_repo: "zervigo-main"
+  
+  # 分支策略
+  branch_strategy:
+    main: "main"
+    develop: "develop"
+    feature_prefix: "feature/"
+    hotfix_prefix: "hotfix/"
+    release_prefix: "release/"
+  
+  # 提交规范
+  commit_convention: "conventional"
+  
+  # 标签策略
+  tag_strategy:
+    prefix: "v"
+    format: "semantic"
+
+# 部署配置
+deployment:
+  # 环境配置
+  environments:
+    development:
+      url: "http://localhost"
+      database: "jobfirst_dev"
+    
+    staging:
+      url: "http://staging.zervigo.com"
+      database: "jobfirst_staging"
+    
+    production:
+      url: "https://zervigo.com"
+      database: "jobfirst_prod"
+  
+  # 部署策略
+  strategy: "blue_green"
+  
+  # 回滚策略
+  rollback:
+    enabled: true
+    max_versions: 5
+
+# 监控配置
+monitoring:
+  # 健康检查
+  health_checks:
+    enabled: true
+    interval: "30s"
+    timeout: "10s"
+  
+  # 指标收集
+  metrics:
+    prometheus:
+      enabled: true
+      port: 9090
+    
+    grafana:
+      enabled: true
+      port: 3000
+  
+  # 日志管理
+  logging:
+    level: "info"
+    format: "json"
+    retention: "30d"
+
+# API管理
+api_management:
+  # 文档生成
+  documentation:
+    swagger:
+      enabled: true
+      version: "3.0"
+    
+    postman:
+      enabled: true
+  
+  # 版本控制
+  versioning:
+    strategy: "url_path"
+    format: "/api/v{version}"
+  
+  # 测试
+  testing:
+    unit_tests: true
+    integration_tests: true
+    e2e_tests: true
+
+# 安全配置
+security:
+  # 认证
+  authentication:
+    jwt:
+      secret: "jobfirst-unified-auth-secret-key-2024"
+      expiration: "24h"
+    
+    oauth:
+      enabled: false
+  
+  # 授权
+  authorization:
+    rbac:
+      enabled: true
+    
+    permissions:
+      - "read:users"
+      - "write:users"
+      - "read:jobs"
+      - "write:jobs"
+      - "read:resumes"
+      - "write:resumes"
+
+# 集成配置
+integrations:
+  # OpenLinkSaaS集成
+  openlinksaas:
+    enabled: true
+    
+    # 工具链集成
+    toolchain:
+      git_integration: true
+      ci_cd_integration: true
+      monitoring_integration: true
+    
+    # 项目管理集成
+    project_management:
+      task_tracking: true
+      knowledge_management: true
+      team_collaboration: true
+    
+    # API集成
+    api_integration:
+      webhook_url: "https://api.openlinksaas.com/webhook"
+      api_key: "${OPENLINKSASS_API_KEY}"
+  
+  # 第三方服务
+  third_party:
+    # 微信小程序
+    wechat:
+      enabled: true
+      app_id: "${WECHAT_APP_ID}"
+      app_secret: "${WECHAT_APP_SECRET}"
+    
+    # 短信服务
+    sms:
+      enabled: true
+      provider: "aliyun"
+      access_key: "${SMS_ACCESS_KEY}"
+      secret_key: "${SMS_SECRET_KEY}"
+
+# 备份配置
+backup:
+  # 数据库备份
+  database:
+    enabled: true
+    schedule: "0 2 * * *"  # 每天凌晨2点
+    retention: "30d"
+  
+  # 文件备份
+  files:
+    enabled: true
+    schedule: "0 3 * * *"  # 每天凌晨3点
+    retention: "7d"
+
+# 通知配置
+notifications:
+  # 邮件通知
+  email:
+    enabled: true
+    smtp_host: "${SMTP_HOST}"
+    smtp_port: 587
+    username: "${SMTP_USERNAME}"
+    password: "${SMTP_PASSWORD}"
+  
+  # 钉钉通知
+  dingtalk:
+    enabled: true
+    webhook_url: "${DINGTALK_WEBHOOK}"
+  
+  # 企业微信通知
+  wechat_work:
+    enabled: true
+    webhook_url: "${WECHAT_WORK_WEBHOOK}"

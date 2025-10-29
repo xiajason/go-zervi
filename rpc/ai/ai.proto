@@ -1,0 +1,192 @@
+syntax = "proto3";
+
+package ai;
+option go_package = "./ai";
+
+// AI匹配请求
+message AIMatchRequest {
+    int64 resume_id = 1;
+    int64 job_id = 2;
+    string match_type = 3;
+    map<string, string> parameters = 4;
+}
+
+// AI匹配响应
+message AIMatchResponse {
+    int64 match_id = 1;
+    double match_score = 2;
+    MatchDetails match_details = 3;
+    repeated Recommendation recommendations = 4;
+    AnalysisResult analysis = 5;
+}
+
+// 匹配详情
+message MatchDetails {
+    double skills_match = 1;
+    double experience_match = 2;
+    double education_match = 3;
+    double location_match = 4;
+    double salary_match = 5;
+    double culture_match = 6;
+}
+
+// 推荐结果
+message Recommendation {
+    string type = 1;
+    string title = 2;
+    string description = 3;
+    int32 priority = 4;
+    string action = 5;
+}
+
+// 分析结果
+message AnalysisResult {
+    repeated string strengths = 1;
+    repeated string weaknesses = 2;
+    repeated string suggestions = 3;
+    repeated string risk_factors = 4;
+}
+
+// 简历分析请求
+message ResumeAnalysisRequest {
+    int64 resume_id = 1;
+    string analysis_type = 2;
+    int64 job_id = 3;
+}
+
+// 简历分析响应
+message ResumeAnalysisResponse {
+    int64 analysis_id = 1;
+    int64 resume_id = 2;
+    string analysis_type = 3;
+    AnalysisResult analysis_result = 4;
+    SkillsAnalysis skills_analysis = 5;
+    ExperienceAnalysis experience_analysis = 6;
+    EducationAnalysis education_analysis = 7;
+    double overall_score = 8;
+    int64 create_time = 9;
+}
+
+// 技能分析
+message SkillsAnalysis {
+    repeated SkillScore technical_skills = 1;
+    repeated SkillScore soft_skills = 2;
+    repeated SkillGap skill_gaps = 3;
+    repeated string skill_recommendations = 4;
+}
+
+// 技能评分
+message SkillScore {
+    string skill_name = 1;
+    string skill_level = 2;
+    double score = 3;
+    double confidence = 4;
+}
+
+// 技能差距
+message SkillGap {
+    string skill_name = 1;
+    string required_level = 2;
+    string current_level = 3;
+    double gap_score = 4;
+    string importance = 5;
+}
+
+// 经验分析
+message ExperienceAnalysis {
+    double total_experience = 1;
+    double relevant_experience = 2;
+    double experience_quality = 3;
+    string career_progression = 4;
+    repeated IndustryExperience industry_experience = 5;
+}
+
+// 行业经验
+message IndustryExperience {
+    string industry = 1;
+    double experience = 2;
+    double relevance = 3;
+}
+
+// 教育分析
+message EducationAnalysis {
+    string education_level = 1;
+    double education_quality = 2;
+    double relevance = 3;
+    repeated string education_gaps = 4;
+}
+
+// AI聊天请求
+message AIChatRequest {
+    string message = 1;
+    string context = 2;
+    int64 user_id = 3;
+    string chat_type = 4;
+    string session_id = 5;
+}
+
+// AI聊天响应
+message AIChatResponse {
+    int64 response_id = 1;
+    string message = 2;
+    string response_type = 3;
+    repeated string suggestions = 4;
+    repeated ChatAction actions = 5;
+    string session_id = 6;
+    int64 timestamp = 7;
+}
+
+// 聊天动作
+message ChatAction {
+    string action_type = 1;
+    map<string, string> action_data = 2;
+    string description = 3;
+}
+
+// 智能推荐请求
+message SmartRecommendRequest {
+    int64 user_id = 1;
+    string recommend_type = 2;
+    int32 limit = 3;
+    map<string, string> filters = 4;
+}
+
+// 智能推荐响应
+message SmartRecommendResponse {
+    repeated RecommendationItem recommendations = 1;
+    int32 total = 2;
+    string algorithm = 3;
+    double confidence = 4;
+}
+
+// 推荐项目
+message RecommendationItem {
+    int64 item_id = 1;
+    string item_type = 2;
+    string title = 3;
+    string description = 4;
+    double score = 5;
+    repeated string reasons = 6;
+    map<string, string> metadata = 7;
+}
+
+// 空响应
+message Empty {}
+
+// AI服务
+service AI {
+    // AI匹配
+    rpc MatchResumeJob(AIMatchRequest) returns(AIMatchResponse);
+    
+    // 简历分析
+    rpc AnalyzeResume(ResumeAnalysisRequest) returns(ResumeAnalysisResponse);
+    
+    // AI聊天
+    rpc Chat(AIChatRequest) returns(AIChatResponse);
+    
+    // 智能推荐
+    rpc SmartRecommend(SmartRecommendRequest) returns(SmartRecommendResponse);
+    
+    // 健康检查
+    rpc HealthCheck(Empty) returns(Empty);
+}

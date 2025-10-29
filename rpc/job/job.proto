@@ -1,0 +1,142 @@
+syntax = "proto3";
+
+package job;
+option go_package = "./job";
+
+// 职位信息
+message Job {
+    int64 job_id = 1;
+    int64 company_id = 2;
+    string company_name = 3;
+    string job_title = 4;
+    string job_description = 5;
+    string job_requirements = 6;
+    string job_type = 7;
+    string work_location = 8;
+    int32 salary_min = 9;
+    int32 salary_max = 10;
+    string experience = 11;
+    string education = 12;
+    repeated string skills = 13;
+    repeated string benefits = 14;
+    int32 status = 15;
+    int64 create_time = 16;
+    int64 update_time = 17;
+}
+
+// 创建职位请求
+message CreateJobRequest {
+    int64 company_id = 1;
+    string job_title = 2;
+    string job_description = 3;
+    string job_requirements = 4;
+    string job_type = 5;
+    string work_location = 6;
+    int32 salary_min = 7;
+    int32 salary_max = 8;
+    string experience = 9;
+    string education = 10;
+    repeated string skills = 11;
+    repeated string benefits = 12;
+}
+
+// 创建职位响应
+message CreateJobResponse {
+    int64 job_id = 1;
+    bool success = 2;
+    string message = 3;
+}
+
+// 更新职位请求
+message UpdateJobRequest {
+    int64 job_id = 1;
+    string job_title = 2;
+    string job_description = 3;
+    string job_requirements = 4;
+    string job_type = 5;
+    string work_location = 6;
+    int32 salary_min = 7;
+    int32 salary_max = 8;
+    string experience = 9;
+    string education = 10;
+    repeated string skills = 11;
+    repeated string benefits = 12;
+    int32 status = 13;
+}
+
+// 更新职位响应
+message UpdateJobResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// 获取职位请求
+message GetJobRequest {
+    int64 job_id = 1;
+}
+
+// 获取职位响应
+message GetJobResponse {
+    Job job = 1;
+}
+
+// 职位搜索请求
+message JobSearchRequest {
+    string keyword = 1;
+    string location = 2;
+    string job_type = 3;
+    int32 salary_min = 4;
+    int32 salary_max = 5;
+    string experience = 6;
+    string education = 7;
+    repeated string skills = 8;
+    int32 page = 9;
+    int32 page_size = 10;
+}
+
+// 职位搜索响应
+message JobSearchResponse {
+    repeated Job jobs = 1;
+    int64 total = 2;
+    int32 page = 3;
+    int32 page_size = 4;
+}
+
+// 职位推荐请求
+message JobRecommendRequest {
+    int64 user_id = 1;
+    int32 limit = 2;
+}
+
+// 职位推荐响应
+message JobRecommendResponse {
+    repeated Job jobs = 1;
+    int32 total = 2;
+}
+
+// 空响应
+message Empty {}
+
+// 职位服务
+service Job {
+    // 创建职位
+    rpc CreateJob(CreateJobRequest) returns(CreateJobResponse);
+    
+    // 获取职位
+    rpc GetJob(GetJobRequest) returns(GetJobResponse);
+    
+    // 更新职位
+    rpc UpdateJob(UpdateJobRequest) returns(UpdateJobResponse);
+    
+    // 删除职位
+    rpc DeleteJob(GetJobRequest) returns(Empty);
+    
+    // 搜索职位
+    rpc SearchJobs(JobSearchRequest) returns(JobSearchResponse);
+    
+    // 推荐职位
+    rpc RecommendJobs(JobRecommendRequest) returns(JobRecommendResponse);
+    
+    // 获取企业职位列表
+    rpc GetCompanyJobs(GetJobRequest) returns(JobSearchResponse);
+}

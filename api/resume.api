@@ -1,0 +1,176 @@
+syntax = "v1"
+
+info (
+	title:   "简历服务API"
+	desc:    "简历管理、简历分析、简历匹配等接口"
+	author:  "Zervigo Team"
+	version: "v1.0.0"
+)
+
+type (
+	// 简历信息
+	Resume {
+		ResumeId       int64            `json:"resume_id"`
+		UserId         int64            `json:"user_id"`
+		ResumeName     string           `json:"resume_name"`
+		PersonalInfo   PersonalInfo     `json:"personal_info"`
+		WorkExperience []WorkExperience `json:"work_experience"`
+		Education      []Education      `json:"education"`
+		Skills         []Skill          `json:"skills"`
+		Projects       []Project        `json:"projects"`
+		Certificates   []Certificate    `json:"certificates"`
+		Status         int              `json:"status"`
+		CreateTime     int64            `json:"create_time"`
+		UpdateTime     int64            `json:"update_time"`
+	}
+	// 个人信息
+	PersonalInfo {
+		RealName string `json:"real_name"`
+		Email    string `json:"email"`
+		Phone    string `json:"phone"`
+		Gender   int    `json:"gender"`
+		Birthday string `json:"birthday"`
+		Location string `json:"location"`
+		Bio      string `json:"bio"`
+		Avatar   string `json:"avatar"`
+	}
+	// 工作经历
+	WorkExperience {
+		ExperienceId int64    `json:"experience_id"`
+		CompanyName  string   `json:"company_name"`
+		Position     string   `json:"position"`
+		StartDate    string   `json:"start_date"`
+		EndDate      string   `json:"end_date"`
+		Description  string   `json:"description"`
+		Achievements []string `json:"achievements"`
+	}
+	// 教育经历
+	Education {
+		EducationId int64  `json:"education_id"`
+		SchoolName  string `json:"school_name"`
+		Major       string `json:"major"`
+		Degree      string `json:"degree"`
+		StartDate   string `json:"start_date"`
+		EndDate     string `json:"end_date"`
+		Description string `json:"description"`
+	}
+	// 技能
+	Skill {
+		SkillId    int64  `json:"skill_id"`
+		SkillName  string `json:"skill_name"`
+		SkillLevel string `json:"skill_level"`
+		Category   string `json:"category"`
+	}
+	// 项目经历
+	Project {
+		ProjectId          int64    `json:"project_id"`
+		ProjectName        string   `json:"project_name"`
+		ProjectDescription string   `json:"project_description"`
+		StartDate          string   `json:"start_date"`
+		EndDate            string   `json:"end_date"`
+		Technologies       []string `json:"technologies"`
+		Responsibilities   []string `json:"responsibilities"`
+	}
+	// 证书
+	Certificate {
+		CertificateId       int64  `json:"certificate_id"`
+		CertificateName     string `json:"certificate_name"`
+		IssuingOrganization string `json:"issuing_organization"`
+		IssueDate           string `json:"issue_date"`
+		ExpiryDate          string `json:"expiry_date"`
+		CertificateUrl      string `json:"certificate_url"`
+	}
+	// 创建简历请求
+	CreateResumeRequest {
+		ResumeName     string           `json:"resume_name"`
+		PersonalInfo   PersonalInfo     `json:"personal_info"`
+		WorkExperience []WorkExperience `json:"work_experience"`
+		Education      []Education      `json:"education"`
+		Skills         []Skill          `json:"skills"`
+		Projects       []Project        `json:"projects"`
+		Certificates   []Certificate    `json:"certificates"`
+	}
+	// 更新简历请求
+	UpdateResumeRequest {
+		ResumeName     string           `json:"resume_name,optional"`
+		PersonalInfo   PersonalInfo     `json:"personal_info,optional"`
+		WorkExperience []WorkExperience `json:"work_experience,optional"`
+		Education      []Education      `json:"education,optional"`
+		Skills         []Skill          `json:"skills,optional"`
+		Projects       []Project        `json:"projects,optional"`
+		Certificates   []Certificate    `json:"certificates,optional"`
+		Status         int              `json:"status,optional"`
+	}
+	// 简历分析请求
+	AnalyzeResumeRequest {
+		ResumeId int64 `json:"resume_id"`
+		JobId    int64 `json:"job_id,optional"`
+	}
+	// 简历分析响应
+	AnalyzeResumeResponse {
+		MatchScore    float64  `json:"match_score"`
+		Strengths     []string `json:"strengths"`
+		Weaknesses    []string `json:"weaknesses"`
+		Suggestions   []string `json:"suggestions"`
+		SkillsMatch   []string `json:"skills_match"`
+		SkillsMissing []string `json:"skills_missing"`
+	}
+	// 简历匹配请求
+	MatchResumeRequest {
+		ResumeId int64 `json:"resume_id"`
+		JobId    int64 `json:"job_id"`
+	}
+	// 简历匹配响应
+	MatchResumeResponse {
+		MatchScore   float64      `json:"match_score"`
+		MatchDetails MatchDetails `json:"match_details"`
+	}
+	// 匹配详情
+	MatchDetails {
+		SkillsMatch     float64 `json:"skills_match"`
+		ExperienceMatch float64 `json:"experience_match"`
+		EducationMatch  float64 `json:"education_match"`
+		LocationMatch   float64 `json:"location_match"`
+		SalaryMatch     float64 `json:"salary_match"`
+	}
+	// 通用响应
+	Response {
+		Code    int         `json:"code"`
+		Message string      `json:"message"`
+		Data    interface{} `json:"data,omitempty"`
+	}
+)
+
+@server (
+	group:      resume
+	middleware: Auth
+)
+service resume-api {
+	@handler createResume
+	post /api/v1/resume (CreateResumeRequest) returns (Response)
+
+	@handler getResume
+	get /api/v1/resume/:id returns (Resume)
+
+	@handler updateResume
+	put /api/v1/resume/:id (UpdateResumeRequest) returns (Response)
+
+	@handler deleteResume
+	delete /api/v1/resume/:id returns (Response)
+
+	@handler getUserResumes
+	get /api/v1/resume/user/:userId returns ([]Resume)
+
+	@handler analyzeResume
+	post /api/v1/resume/analyze (AnalyzeResumeRequest) returns (AnalyzeResumeResponse)
+
+	@handler matchResume
+	post /api/v1/resume/match (MatchResumeRequest) returns (MatchResumeResponse)
+
+	@handler uploadResumeFile
+	post /api/v1/resume/upload returns (Response)
+
+	@handler parseResumeFile
+	post /api/v1/resume/parse returns (Response)
+}
+

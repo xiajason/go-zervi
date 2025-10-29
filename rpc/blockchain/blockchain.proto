@@ -1,0 +1,180 @@
+syntax = "proto3";
+
+package blockchain;
+option go_package = "./blockchain";
+
+// 区块链交易记录
+message BlockchainTransaction {
+    string transaction_id = 1;
+    string transaction_type = 2;
+    string entity_id = 3;
+    string version_source = 4;
+    string old_value = 5;
+    string new_value = 6;
+    string change_reason = 7;
+    string operator_id = 8;
+    string transaction_hash = 9;
+    string transaction_data = 10;
+    string status = 11;
+    int64 block_height = 12;
+    int64 create_time = 13;
+    int64 confirm_time = 14;
+}
+
+// 记录交易请求
+message RecordTransactionRequest {
+    string transaction_type = 1;
+    string entity_id = 2;
+    string version_source = 3;
+    string old_value = 4;
+    string new_value = 5;
+    string change_reason = 6;
+    string operator_id = 7;
+    map<string, string> transaction_data = 8;
+}
+
+// 记录交易响应
+message RecordTransactionResponse {
+    string transaction_id = 1;
+    string transaction_hash = 2;
+    int64 block_height = 3;
+    string status = 4;
+    int64 create_time = 5;
+}
+
+// 版本状态变化请求
+message VersionStatusChangeRequest {
+    string user_id = 1;
+    string version_source = 2;
+    string old_status = 3;
+    string new_status = 4;
+    string change_reason = 5;
+    string operator_id = 6;
+}
+
+// 版本状态变化响应
+message VersionStatusChangeResponse {
+    string transaction_id = 1;
+    string transaction_hash = 2;
+    int64 block_height = 3;
+    string status = 4;
+    int64 create_time = 5;
+}
+
+// 权限变更请求
+message PermissionChangeRequest {
+    string user_id = 1;
+    string version_source = 2;
+    string old_permission = 3;
+    string new_permission = 4;
+    string change_reason = 5;
+    string operator_id = 6;
+}
+
+// 权限变更响应
+message PermissionChangeResponse {
+    string transaction_id = 1;
+    string transaction_hash = 2;
+    int64 block_height = 3;
+    string status = 4;
+    int64 create_time = 5;
+}
+
+// 查询交易历史请求
+message QueryTransactionHistoryRequest {
+    string entity_id = 1;
+    string transaction_type = 2;
+    string version_source = 3;
+    int64 start_time = 4;
+    int64 end_time = 5;
+    int32 page = 6;
+    int32 page_size = 7;
+}
+
+// 查询交易历史响应
+message QueryTransactionHistoryResponse {
+    repeated BlockchainTransaction transactions = 1;
+    int64 total = 2;
+    int32 page = 3;
+    int32 page_size = 4;
+}
+
+// 数据一致性验证请求
+message DataConsistencyValidateRequest {
+    string entity_id = 1;
+    string entity_type = 2;
+    string version_source = 3;
+    string validate_type = 4;
+}
+
+// 数据一致性验证响应
+message DataConsistencyValidateResponse {
+    string validation_id = 1;
+    string entity_id = 2;
+    string entity_type = 3;
+    string validation_result = 4;
+    repeated Inconsistency inconsistencies = 5;
+    int64 validation_time = 6;
+}
+
+// 不一致记录
+message Inconsistency {
+    string field = 1;
+    string blockchain_value = 2;
+    string database_value = 3;
+    string transaction_hash = 4;
+    int64 block_height = 5;
+}
+
+// 区块链统计
+message BlockchainStats {
+    int64 total_transactions = 1;
+    int64 total_blocks = 2;
+    int64 active_transactions = 3;
+    int64 pending_transactions = 4;
+    int64 confirmed_transactions = 5;
+    int64 failed_transactions = 6;
+    double average_block_time = 7;
+    double network_hash_rate = 8;
+}
+
+// 区块链健康检查
+message BlockchainHealth {
+    string status = 1;
+    int64 last_block_height = 2;
+    int64 last_block_time = 3;
+    int64 pending_transactions = 4;
+    double network_latency = 5;
+    double error_rate = 6;
+    double uptime = 7;
+}
+
+// 空响应
+message Empty {}
+
+// 区块链服务
+service Blockchain {
+    // 记录交易
+    rpc RecordTransaction(RecordTransactionRequest) returns(RecordTransactionResponse);
+    
+    // 记录版本状态变化
+    rpc RecordVersionStatusChange(VersionStatusChangeRequest) returns(VersionStatusChangeResponse);
+    
+    // 记录权限变更
+    rpc RecordPermissionChange(PermissionChangeRequest) returns(PermissionChangeResponse);
+    
+    // 查询交易历史
+    rpc QueryTransactionHistory(QueryTransactionHistoryRequest) returns(QueryTransactionHistoryResponse);
+    
+    // 获取交易信息
+    rpc GetTransaction(RecordTransactionRequest) returns(BlockchainTransaction);
+    
+    // 验证数据一致性
+    rpc ValidateDataConsistency(DataConsistencyValidateRequest) returns(DataConsistencyValidateResponse);
+    
+    // 获取区块链统计
+    rpc GetBlockchainStats(Empty) returns(BlockchainStats);
+    
+    // 获取区块链健康状态
+    rpc GetBlockchainHealth(Empty) returns(BlockchainHealth);
+}

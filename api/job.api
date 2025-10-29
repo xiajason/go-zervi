@@ -1,0 +1,135 @@
+syntax = "v1"
+
+info (
+	title:   "职位服务API"
+	desc:    "职位管理、职位搜索、职位推荐等接口"
+	author:  "Zervigo Team"
+	version: "v1.0.0"
+)
+
+type (
+	// 职位信息
+	Job {
+		JobId           int64    `json:"job_id"`
+		CompanyId       int64    `json:"company_id"`
+		CompanyName     string   `json:"company_name"`
+		JobTitle        string   `json:"job_title"`
+		JobDescription  string   `json:"job_description"`
+		JobRequirements string   `json:"job_requirements"`
+		JobType         string   `json:"job_type"`
+		WorkLocation    string   `json:"work_location"`
+		SalaryMin       int      `json:"salary_min"`
+		SalaryMax       int      `json:"salary_max"`
+		Experience      string   `json:"experience"`
+		Education       string   `json:"education"`
+		Skills          []string `json:"skills"`
+		Benefits        []string `json:"benefits"`
+		Status          int      `json:"status"`
+		CreateTime      int64    `json:"create_time"`
+		UpdateTime      int64    `json:"update_time"`
+	}
+	// 创建职位请求
+	CreateJobRequest {
+		CompanyId       int64    `json:"company_id"`
+		JobTitle        string   `json:"job_title"`
+		JobDescription  string   `json:"job_description"`
+		JobRequirements string   `json:"job_requirements"`
+		JobType         string   `json:"job_type"`
+		WorkLocation    string   `json:"work_location"`
+		SalaryMin       int      `json:"salary_min"`
+		SalaryMax       int      `json:"salary_max"`
+		Experience      string   `json:"experience"`
+		Education       string   `json:"education"`
+		Skills          []string `json:"skills"`
+		Benefits        []string `json:"benefits"`
+	}
+	// 更新职位请求
+	UpdateJobRequest {
+		JobTitle        string   `json:"job_title,optional"`
+		JobDescription  string   `json:"job_description,optional"`
+		JobRequirements string   `json:"job_requirements,optional"`
+		JobType         string   `json:"job_type,optional"`
+		WorkLocation    string   `json:"work_location,optional"`
+		SalaryMin       int      `json:"salary_min,optional"`
+		SalaryMax       int      `json:"salary_max,optional"`
+		Experience      string   `json:"experience,optional"`
+		Education       string   `json:"education,optional"`
+		Skills          []string `json:"skills,optional"`
+		Benefits        []string `json:"benefits,optional"`
+		Status          int      `json:"status,optional"`
+	}
+	// 职位搜索请求
+	JobSearchRequest {
+		Keyword    string   `json:"keyword,optional"`
+		Location   string   `json:"location,optional"`
+		JobType    string   `json:"job_type,optional"`
+		SalaryMin  int      `json:"salary_min,optional"`
+		SalaryMax  int      `json:"salary_max,optional"`
+		Experience string   `json:"experience,optional"`
+		Education  string   `json:"education,optional"`
+		Skills     []string `json:"skills,optional"`
+		Page       int      `json:"page,default=1"`
+		PageSize   int      `json:"page_size,default=10"`
+	}
+	// 职位搜索响应
+	JobSearchResponse {
+		List     []Job `json:"list"`
+		Total    int64 `json:"total"`
+		Page     int   `json:"page"`
+		PageSize int   `json:"page_size"`
+	}
+	// 职位推荐请求
+	JobRecommendRequest {
+		UserId int64 `json:"user_id"`
+		Limit  int   `json:"limit,default=10"`
+	}
+	// 职位推荐响应
+	JobRecommendResponse {
+		List  []Job `json:"list"`
+		Total int   `json:"total"`
+	}
+	// 职位列表请求
+	JobListRequest {
+		Page      int   `json:"page,default=1"`
+		PageSize  int   `json:"page_size,default=10"`
+		CompanyId int64 `json:"company_id,optional"`
+		Status    int   `json:"status,optional"`
+	}
+	// 通用响应
+	Response {
+		Code    int         `json:"code"`
+		Message string      `json:"message"`
+		Data    interface{} `json:"data,omitempty"`
+	}
+)
+
+@server (
+	group:      job
+	middleware: Auth
+)
+service job-api {
+	@handler createJob
+	post /api/v1/job (CreateJobRequest) returns (Response)
+
+	@handler getJob
+	get /api/v1/job/:id returns (Job)
+
+	@handler updateJob
+	put /api/v1/job/:id (UpdateJobRequest) returns (Response)
+
+	@handler deleteJob
+	delete /api/v1/job/:id returns (Response)
+
+	@handler searchJobs
+	post /api/v1/job/search (JobSearchRequest) returns (JobSearchResponse)
+
+	@handler recommendJobs
+	post /api/v1/job/recommend (JobRecommendRequest) returns (JobRecommendResponse)
+
+	@handler getJobList
+	get /api/v1/job/list (JobListRequest) returns (JobSearchResponse)
+
+	@handler getCompanyJobs
+	get /api/v1/job/company/:companyId (JobListRequest) returns (JobSearchResponse)
+}
+

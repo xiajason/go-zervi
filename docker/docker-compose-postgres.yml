@@ -1,0 +1,311 @@
+version: '3.8'
+
+# Zervigo MVP 微服务架构
+# 基于Go语言的中央大脑 + 多微服务架构
+# 统一使用PostgreSQL作为主要数据库
+
+services:
+  # ==================== 基础设施服务 ====================
+  
+  # PostgreSQL数据库 (主要数据库)
+  postgres:
+    image: postgres:15-alpine
+    container_name: zervigo-postgres-mvp
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: zervigo_mvp
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_mvp_data:/var/lib/postgresql/data
+      - ./databases/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - zervigo-mvp
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d zervigo_mvp"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Redis缓存 (特殊用途)
+  redis:
+    image: redis:7-alpine
+    container_name: zervigo-redis-mvp
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_mvp_data:/data
+    networks:
+      - zervigo-mvp
+    command: redis-server --appendonly yes --requirepass dev_password
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Consul服务发现
+  consul:
+    image: consul:1.16
+    container_name: zervigo-consul-mvp
+    restart: unless-stopped
+    command: agent -server -bootstrap-expect=1 -ui -bind=0.0.0.0 -client=0.0.0.0
+    ports:
+      - "8500:8500"
+    volumes:
+      - consul_mvp_data:/consul/data
+    networks:
+      - zervigo-mvp
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ==================== 微服务 ====================
+
+  # 中央大脑 (API Gateway)
+  central-brain:
+    build:
+      context: ./src/central-brain
+      dockerfile: Dockerfile
+    container_name: zervigo-central-brain-mvp
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      - POSTGRESQL_URL=postgres://postgres:dev_password@postgres:5432/zervigo_mvp?sslmode=disable
+      - REDIS_URL=redis://:dev_password@redis:6379
+      - JWT_SECRET=zervigo-mvp-secret-key-2025
+      - CENTRAL_BRAIN_PORT=9000
+      - AUTH_SERVICE_PORT=8207
+      - AI_SERVICE_PORT=8100
+      - BLOCKCHAIN_SERVICE_PORT=8208
+      - USER_SERVICE_PORT=8082
+      - JOB_SERVICE_PORT=8084
+      - RESUME_SERVICE_PORT=8085
+      - COMPANY_SERVICE_PORT=8083
+      - SERVICE_DISCOVERY_ENABLED=false
+      - CONSUL_AGENT_URL=http://consul:8500
+      - TOKEN_VALIDATION_ENABLED=true
+      - METRICS_ENABLED=true
+      - LOGGING_LEVEL=INFO
+      - ENVIRONMENT=development
+    volumes:
+      - ./src/central-brain:/app
+      - ./src/shared:/app/src/shared
+    networks:
+      - zervigo-mvp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+
+  # 认证服务
+  auth-service:
+    build:
+      context: ./service/auth
+      dockerfile: Dockerfile
+    container_name: zervigo-auth-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8207:8207"
+    environment:
+      - POSTGRESQL_URL=postgres://postgres:dev_password@postgres:5432/zervigo_mvp?sslmode=disable
+      - REDIS_URL=redis://:dev_password@redis:6379
+      - JWT_SECRET=zervigo-mvp-secret-key-2025
+      - AUTH_SERVICE_PORT=8207
+      - ENVIRONMENT=development
+    volumes:
+      - ./service/auth:/app
+    networks:
+      - zervigo-mvp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+
+  # 用户服务
+  user-service:
+    build:
+      context: ./service/user
+      dockerfile: Dockerfile
+    container_name: zervigo-user-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - POSTGRESQL_URL=postgres://postgres:dev_password@postgres:5432/zervigo_mvp?sslmode=disable
+      - REDIS_URL=redis://:dev_password@redis:6379
+      - JWT_SECRET=zervigo-mvp-secret-key-2025
+      - USER_SERVICE_PORT=8082
+      - ENVIRONMENT=development
+    volumes:
+      - ./service/user:/app
+    networks:
+      - zervigo-mvp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+
+  # 职位服务
+  job-service:
+    build:
+      context: ./service/job
+      dockerfile: Dockerfile
+    container_name: zervigo-job-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      - POSTGRESQL_URL=postgres://postgres:dev_password@postgres:5432/zervigo_mvp?sslmode=disable
+      - REDIS_URL=redis://:dev_password@redis:6379
+      - JWT_SECRET=zervigo-mvp-secret-key-2025
+      - JOB_SERVICE_PORT=8084
+      - ENVIRONMENT=development
+    volumes:
+      - ./service/job:/app
+    networks:
+      - zervigo-mvp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+
+  # 简历服务
+  resume-service:
+    build:
+      context: ./service/resume
+      dockerfile: Dockerfile
+    container_name: zervigo-resume-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      - POSTGRESQL_URL=postgres://postgres:dev_password@postgres:5432/zervigo_mvp?sslmode=disable
+      - REDIS_URL=redis://:dev_password@redis:6379
+      - JWT_SECRET=zervigo-mvp-secret-key-2025
+      - RESUME_SERVICE_PORT=8085
+      - ENVIRONMENT=development
+    volumes:
+      - ./service/resume:/app
+    networks:
+      - zervigo-mvp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+
+  # 企业服务
+  company-service:
+    build:
+      context: ./service/company
+      dockerfile: Dockerfile
+    container_name: zervigo-company-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      - POSTGRESQL_URL=postgres://postgres:dev_password@postgres:5432/zervigo_mvp?sslmode=disable
+      - REDIS_URL=redis://:dev_password@redis:6379
+      - JWT_SECRET=zervigo-mvp-secret-key-2025
+      - COMPANY_SERVICE_PORT=8083
+      - ENVIRONMENT=development
+    volumes:
+      - ./service/company:/app
+    networks:
+      - zervigo-mvp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+
+  # AI服务 (Python)
+  ai-service:
+    build:
+      context: ./src/ai-service-python
+      dockerfile: Dockerfile.dev
+    container_name: zervigo-ai-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8100:8100"
+    environment:
+      - POSTGRESQL_URL=postgres://postgres:dev_password@postgres:5432/zervigo_mvp?sslmode=disable
+      - REDIS_URL=redis://:dev_password@redis:6379
+      - JWT_SECRET=zervigo-mvp-secret-key-2025
+      - AI_SERVICE_PORT=8100
+      - ENVIRONMENT=development
+    volumes:
+      - ./src/ai-service-python:/app
+    networks:
+      - zervigo-mvp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 1g
+    cpus: 2.0
+
+  # 区块链服务
+  blockchain-service:
+    build:
+      context: ./service/blockchain
+      dockerfile: Dockerfile
+    container_name: zervigo-blockchain-service-mvp
+    restart: unless-stopped
+    ports:
+      - "8208:8208"
+    environment:
+      - POSTGRESQL_URL=postgres://postgres:dev_password@postgres:5432/zervigo_mvp?sslmode=disable
+      - REDIS_URL=redis://:dev_password@redis:6379
+      - JWT_SECRET=zervigo-mvp-secret-key-2025
+      - BLOCKCHAIN_SERVICE_PORT=8208
+      - ENVIRONMENT=development
+    volumes:
+      - ./service/blockchain:/app
+    networks:
+      - zervigo-mvp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1.0
+
+networks:
+  zervigo-mvp:
+    driver: bridge
+
+volumes:
+  postgres_mvp_data:
+    driver: local
+  redis_mvp_data:
+    driver: local
+  consul_mvp_data:
+    driver: local

@@ -1,0 +1,268 @@
+version: '3.8'
+
+# 本地开发环境 Docker Compose 配置
+# 用途: 在本地Mac上运行完整的JobFirst开发环境
+# 包含所有数据库和管理工具
+
+services:
+  # ==================== 核心数据库 ====================
+  
+  # MySQL - 核心关系数据库 (三版本数据库)
+  mysql:
+    image: mysql:8.0
+    container_name: local-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: local_dev_password
+      MYSQL_DATABASE: jobfirst_basic
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./configs/mysql:/etc/mysql/conf.d:ro
+    command: 
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-connections=300
+    networks:
+      - jobfirst-net
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-plocal_dev_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # PostgreSQL - 向量存储
+  postgres:
+    image: postgres:14
+    container_name: local-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: local_dev_password
+      POSTGRES_DB: jobfirst_vector
+      POSTGRES_USER: postgres
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - jobfirst-net
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Redis - 缓存
+  redis:
+    image: redis:6-alpine
+    container_name: local-redis
+    restart: unless-stopped
+    command: redis-server --requirepass local_dev_password --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - jobfirst-net
+    mem_limit: 128m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "local_dev_password", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # MongoDB - 文档存储
+  mongodb:
+    image: mongo:6.0
+    container_name: local-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: local_dev_password
+      TZ: Asia/Shanghai
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - jobfirst-net
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Neo4j - 图数据库 (DAO/区块链)
+  neo4j:
+    image: neo4j:latest
+    container_name: local-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/local_dev_password
+      NEO4J_dbms_memory_heap_max__size: 512m
+      NEO4J_dbms_memory_pagecache_size: 256m
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+      TZ: Asia/Shanghai
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - jobfirst-net
+    mem_limit: 768m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7474"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==================== 扩展数据库（可选） ====================
+  
+  # Elasticsearch - 全文搜索引擎
+  elasticsearch:
+    image: elasticsearch:8.8.0
+    container_name: local-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms256m -Xmx512m"
+      - xpack.security.enabled=false
+      - TZ=Asia/Shanghai
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - jobfirst-net
+    mem_limit: 768m
+    cpus: 1.0
+    profiles:
+      - full  # 使用 --profile full 启动
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Weaviate - 向量搜索引擎
+  weaviate:
+    image: semitechnologies/weaviate:latest
+    container_name: local-weaviate
+    restart: unless-stopped
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_MODULES: ''
+      TZ: Asia/Shanghai
+    ports:
+      - "8080:8080"
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    networks:
+      - jobfirst-net
+    mem_limit: 256m
+    cpus: 0.5
+    profiles:
+      - full  # 使用 --profile full 启动
+
+  # ==================== 管理工具 ====================
+  
+  # Adminer - Web数据库管理界面
+  adminer:
+    image: adminer:latest
+    container_name: local-adminer
+    restart: unless-stopped
+    ports:
+      - "8888:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: mysql
+      ADMINER_DESIGN: nette
+    networks:
+      - jobfirst-net
+    depends_on:
+      - mysql
+      - postgres
+      - mongodb
+
+  # Redis Commander - Redis管理界面
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: local-redis-commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:local-redis:6379:0:local_dev_password
+    ports:
+      - "8081:8081"
+    networks:
+      - jobfirst-net
+    depends_on:
+      - redis
+    profiles:
+      - tools
+
+  # Mongo Express - MongoDB管理界面
+  mongo-express:
+    image: mongo-express:latest
+    container_name: local-mongo-express
+    restart: unless-stopped
+    ports:
+      - "8082:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: local_dev_password
+      ME_CONFIG_MONGODB_URL: mongodb://admin:local_dev_password@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: local_dev_password
+    networks:
+      - jobfirst-net
+    depends_on:
+      - mongodb
+    profiles:
+      - tools
+
+# ==================== 数据卷 ====================
+volumes:
+  mysql_data:
+    name: jobfirst_local_mysql
+  postgres_data:
+    name: jobfirst_local_postgres
+  redis_data:
+    name: jobfirst_local_redis
+  mongodb_data:
+    name: jobfirst_local_mongodb
+  neo4j_data:
+    name: jobfirst_local_neo4j_data
+  neo4j_logs:
+    name: jobfirst_local_neo4j_logs
+  elasticsearch_data:
+    name: jobfirst_local_elasticsearch
+  weaviate_data:
+    name: jobfirst_local_weaviate
+
+# ==================== 网络 ====================
+networks:
+  jobfirst-net:
+    name: jobfirst_local_network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
