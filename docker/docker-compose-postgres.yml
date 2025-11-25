@@ -51,7 +51,7 @@ services:
 
   # Consul服务发现
   consul:
-    image: consul:1.16
+    image: consul:1.15
     container_name: zervigo-consul-mvp
     restart: unless-stopped
     command: agent -server -bootstrap-expect=1 -ui -bind=0.0.0.0 -client=0.0.0.0

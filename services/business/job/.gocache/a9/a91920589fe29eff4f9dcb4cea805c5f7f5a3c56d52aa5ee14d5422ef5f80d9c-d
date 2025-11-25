@@ -1,0 +1,3 @@
+./errors.go
+./packer.go
+./unpacker.go

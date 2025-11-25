@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>VueCMF 请求流程测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        h1 { color: #333; border-bottom: 2px solid #409EFF; padding-bottom: 10px; }
+        .step { margin: 20px 0; padding: 15px; background: #f9f9f9; border-left: 4px solid #409EFF; }
+        .step h3 { color: #409EFF; margin-top: 0; }
+        button { background: #409EFF; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #66b1ff; }
+        pre { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 4px; overflow-x: auto; max-height: 400px; }
+        .success { color: #67C23A; }
+        .error { color: #F56C6C; }
+        .info { color: #409EFF; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 VueCMF 完整请求流程测试</h1>
+        
+        <div class="step">
+            <h3>步骤1: 获取菜单和API映射</h3>
+            <button onclick="step1()">执行步骤1</button>
+            <pre id="step1-result">等待执行...</pre>
+        </div>
+
+        <div class="step">
+            <h3>步骤2: 模拟VueCMF动态获取API路径</h3>
+            <button onclick="step2()">执行步骤2</button>
+            <pre id="step2-result">等待执行...</pre>
+        </div>
+
+        <div class="step">
+            <h3>步骤3: 模拟VueCMF请求角色列表</h3>
+            <button onclick="step3()">执行步骤3</button>
+            <pre id="step3-result">等待执行...</pre>
+        </div>
+
+        <div class="step">
+            <h3>步骤4: 完整流程（一键测试所有）</h3>
+            <button onclick="runAllSteps()">执行完整流程</button>
+            <pre id="all-result">等待执行...</pre>
+        </div>
+
+        <div class="step">
+            <h3>步骤5: 复制到浏览器控制台</h3>
+            <button onclick="copyToClipboard()">复制修复脚本</button>
+            <p>复制后在VueCMF页面的控制台中粘贴并执行</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:9000';
+
+        function log(elementId, message) {
+            document.getElementById(elementId).textContent = message;
+        }
+
+        // 步骤1: 获取菜单和API映射
+        async function step1() {
+            log('step1-result', '🔄 正在请求...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/menu/nav`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: { username: 'admin' } })
+                });
+                
+                const data = await response.json();
+                
+                if (data.code === 0) {
+                    const apiMaps = data.data.api_maps;
+                    const result = {
+                        status: '✅ 成功',
+                        菜单数量: Object.keys(data.data.nav_menu).length,
+                        API映射: {
+                            admin_index: apiMaps.admin?.index,
+                            roles_index: apiMaps.roles?.index,
+                            permissions_index: apiMaps.permissions?.index
+                        }
+                    };
+                    
+                    // 保存到sessionStorage供后续步骤使用
+                    sessionStorage.setItem('test_api_maps', JSON.stringify(apiMaps));
+                    
+                    log('step1-result', JSON.stringify(result, null, 2));
+                } else {
+                    log('step1-result', `❌ 失败: ${data.message || data.msg}`);
+                }
+            } catch (error) {
+                log('step1-result', `❌ 错误: ${error.message}`);
+            }
+        }
+
+        // 步骤2: 动态获取API路径（模拟VueCMF）
+        async function step2() {
+            log('step2-result', '🔄 正在请求...');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/mapping/get_api_map`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        data: {
+                            table_name: 'roles',
+                            action_type: 'index'
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.code === 0) {
+                    const result = {
+                        status: '✅ 成功',
+                        table_name: 'roles',
+                        action_type: 'index',
+                        api_path: data.data
+                    };
+                    log('step2-result', JSON.stringify(result, null, 2));
+                } else {
+                    log('step2-result', `❌ 失败: ${data.message || data.msg}`);
+                }
+            } catch (error) {
+                log('step2-result', `❌ 错误: ${error.message}`);
+            }
+        }
+
+        // 步骤3: 请求角色列表（模拟VueCMF）
+        async function step3() {
+            log('step3-result', '🔄 正在请求...');
+            
+            // 从step1获取的API映射
+            const apiMapsStr = sessionStorage.getItem('test_api_maps');
+            if (!apiMapsStr) {
+                log('step3-result', '❌ 请先执行步骤1');
+                return;
+            }
+            
+            const apiMaps = JSON.parse(apiMapsStr);
+            const apiPath = apiMaps.roles?.index;
+            
+            if (!apiPath) {
+                log('step3-result', '❌ 未找到roles.index的API路径');
+                return;
+            }
+            
+            try {
+                const url = `${API_BASE}${apiPath}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        data: {
+                            table_name: 'roles',
+                            page: 1,
+                            page_size: 20
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.code === 0) {
+                    const result = {
+                        status: '✅ 成功',
+                        请求URL: url,
+                        数据总数: data.data.total,
+                        当前页数据: data.data.list.length,
+                        数据预览: data.data.list.map(item => ({
+                            id: item.id,
+                            role_name: item.role_name,
+                            description: item.description
+                        }))
+                    };
+                    log('step3-result', JSON.stringify(result, null, 2));
+                } else {
+                    log('step3-result', `❌ 失败: ${data.message || data.msg}`);
+                }
+            } catch (error) {
+                log('step3-result', `❌ 错误: ${error.message}`);
+            }
+        }
+
+        // 完整流程
+        async function runAllSteps() {
+            log('all-result', '🔄 开始执行完整流程...\n\n');
+            
+            let result = '=== VueCMF 完整请求流程测试 ===\n\n';
+            
+            // 步骤1
+            result += '步骤1: 获取菜单和API映射\n';
+            try {
+                const res1 = await fetch(`${API_BASE}/api/v1/menu/nav`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: { username: 'admin' } })
+                });
+                const data1 = await res1.json();
+                
+                if (data1.code === 0) {
+                    result += '✅ 成功\n';
+                    result += `   菜单数量: ${Object.keys(data1.data.nav_menu).length}\n`;
+                    result += `   API映射: roles.index = ${data1.data.api_maps.roles?.index}\n\n`;
+                    
+                    // 步骤2: 使用获取到的API路径请求数据
+                    const apiPath = data1.data.api_maps.roles?.index;
+                    if (apiPath) {
+                        result += '步骤2: 请求角色列表\n';
+                        result += `   URL: ${API_BASE}${apiPath}\n`;
+                        
+                        const res2 = await fetch(`${API_BASE}${apiPath}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                data: { table_name: 'roles', page: 1, page_size: 20 }
+                            })
+                        });
+                        const data2 = await res2.json();
+                        
+                        if (data2.code === 0) {
+                            result += '✅ 成功\n';
+                            result += `   数据总数: ${data2.data.total}\n`;
+                            result += `   数据列表:\n`;
+                            data2.data.list.forEach((item, idx) => {
+                                result += `   ${idx + 1}. ${item.role_name} - ${item.description}\n`;
+                            });
+                            result += '\n✅✅✅ 所有测试通过！数据可以正常获取！\n';
+                            result += '\n如果VueCMF页面仍然不显示数据，请:\n';
+                            result += '1. 清除localStorage: localStorage.clear()\n';
+                            result += '2. 刷新页面\n';
+                            result += '3. 检查浏览器控制台的"网络"标签，查看实际请求\n';
+                        } else {
+                            result += `❌ 失败: ${data2.message || data2.msg}\n`;
+                        }
+                    }
+                } else {
+                    result += `❌ 失败: ${data1.message || data1.msg}\n`;
+                }
+            } catch (error) {
+                result += `❌ 错误: ${error.message}\n`;
+            }
+            
+            log('all-result', result);
+        }
+
+        // 复制修复脚本
+        function copyToClipboard() {
+            const script = `
+// VueCMF 修复脚本 - 在VueCMF页面的控制台中执行
+console.clear();
+console.log('=== VueCMF 数据修复 ===');
+
+// 1. 清除旧的缓存
+localStorage.removeItem('vuecmf_menu');
+localStorage.removeItem('vuecmf_api_maps');
+console.log('✅ 已清除旧缓存');
+
+// 2. 重新获取菜单和API映射
+fetch('http://localhost:9000/api/v1/menu/nav', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({data: {username: 'admin'}})
+})
+.then(res => res.json())
+.then(data => {
+  if (data.code === 0) {
+    localStorage.setItem('vuecmf_menu', JSON.stringify(data.data.nav_menu));
+    localStorage.setItem('vuecmf_api_maps', JSON.stringify(data.data.api_maps));
+    console.log('✅ 新的API映射已保存:');
+    console.log('   admin.index:', data.data.api_maps.admin?.index);
+    console.log('   roles.index:', data.data.api_maps.roles?.index);
+    console.log('   permissions.index:', data.data.api_maps.permissions?.index);
+    console.log('\\n刷新页面: location.reload()');
+    setTimeout(() => location.reload(), 2000);
+  }
+});
+`;
+            
+            navigator.clipboard.writeText(script).then(() => {
+                alert('✅ 修复脚本已复制到剪贴板！\n\n请：\n1. 切换到VueCMF页面\n2. 打开控制台（F12）\n3. 粘贴并执行');
+            }).catch(err => {
+                alert('复制失败，请手动复制下面的脚本:\n\n' + script);
+            });
+        }
+
+        // 页面加载时的说明
+        window.addEventListener('load', () => {
+            console.log('VueCMF 请求流程测试页面已加载');
+            console.log('建议按顺序执行步骤1-3，或直接执行步骤4（完整流程）');
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+

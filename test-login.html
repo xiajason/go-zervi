@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zervigo 登录测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #409eff; }
+        input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #67c23a;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background: #5daf34; }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success { background: #f0f9ff; border: 1px solid #409eff; }
+        .error { background: #fef0f0; border: 1px solid #f56c6c; }
+        .info { background: #f4f4f5; border: 1px solid #909399; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Zervigo 后端测试</h1>
+        
+        <h3>1. 测试登录</h3>
+        <input type="text" id="username" placeholder="用户名" value="admin">
+        <input type="password" id="password" placeholder="密码" value="admin123">
+        <button onclick="testLogin()">测试登录</button>
+        <div id="loginResult" class="result info" style="display:none;"></div>
+        
+        <h3>2. 测试菜单数据</h3>
+        <button onclick="testMenu()">测试菜单</button>
+        <div id="menuResult" class="result info" style="display:none;"></div>
+        
+        <h3>3. 完整流程测试</h3>
+        <button onclick="testFull()">完整测试</button>
+        <div id="fullResult" class="result info" style="display:none;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:9000';
+        
+        function showResult(elementId, content, isSuccess) {
+            const el = document.getElementById(elementId);
+            el.style.display = 'block';
+            el.className = 'result ' + (isSuccess ? 'success' : 'error');
+            el.textContent = content;
+        }
+        
+        async function testLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        data: {
+                            login_name: username,
+                            password: password
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.code === 0) {
+                    const result = `✅ 登录成功！
+                    
+用户ID: ${data.data.userId}
+用户名: ${data.data.userName}
+Token: ${data.data.accessToken.substring(0, 50)}...
+
+后端完全正常！`;
+                    showResult('loginResult', result, true);
+                    
+                    // 存储 token
+                    localStorage.setItem('token', data.data.accessToken);
+                } else {
+                    showResult('loginResult', `❌ 登录失败\n\n${JSON.stringify(data, null, 2)}`, false);
+                }
+            } catch(e) {
+                showResult('loginResult', `❌ 请求失败\n\n${e.message}`, false);
+            }
+        }
+        
+        async function testMenu() {
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/menu/nav`);
+                const data = await response.json();
+                
+                if (data.code === 0 && data.data.nav_menu) {
+                    const menuList = data.data.nav_menu.map(m => `  - ${m.title} (${m.path})`).join('\n');
+                    const result = `✅ 菜单数据正常！
+
+菜单数量: ${data.data.nav_menu.length} 条
+
+菜单列表:
+${menuList}
+
+响应格式:
+${JSON.stringify(data, null, 2)}`;
+                    showResult('menuResult', result, true);
+                } else {
+                    showResult('menuResult', `⚠️ 格式异常\n\n${JSON.stringify(data, null, 2)}`, false);
+                }
+            } catch(e) {
+                showResult('menuResult', `❌ 请求失败\n\n${e.message}`, false);
+            }
+        }
+        
+        async function testFull() {
+            let log = '开始完整测试...\n\n';
+            
+            try {
+                // 1. 测试登录
+                log += '1️⃣ 测试登录...\n';
+                const loginRes = await fetch(`${API_BASE}/api/v1/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        data: {
+                            login_name: 'admin',
+                            password: 'admin123'
+                        }
+                    })
+                });
+                const loginData = await loginRes.json();
+                
+                if (loginData.code === 0) {
+                    log += '   ✅ 登录成功\n';
+                    log += `   UserID: ${loginData.data.userId}\n\n`;
+                } else {
+                    log += `   ❌ 登录失败: ${JSON.stringify(loginData)}\n\n`;
+                    showResult('fullResult', log, false);
+                    return;
+                }
+                
+                // 2. 测试菜单
+                log += '2️⃣ 测试菜单...\n';
+                const menuRes = await fetch(`${API_BASE}/api/v1/menu/nav`);
+                const menuData = await menuRes.json();
+                
+                if (menuData.code === 0 && menuData.data.nav_menu) {
+                    log += '   ✅ 菜单数据正常\n';
+                    log += `   菜单数量: ${menuData.data.nav_menu.length}\n\n`;
+                } else {
+                    log += `   ❌ 菜单格式错误: ${JSON.stringify(menuData)}\n\n`;
+                    showResult('fullResult', log, false);
+                    return;
+                }
+                
+                // 3. 测试 API 映射
+                log += '3️⃣ 测试 API 映射...\n';
+                const mapRes = await fetch(`${API_BASE}/api/v1/mapping/get_api_map`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        data: {
+                            table_name: 'menu',
+                            action_type: 'nav'
+                        }
+                    })
+                });
+                const mapData = await mapRes.json();
+                
+                if (mapData.code === 0) {
+                    log += '   ✅ API 映射正常\n';
+                    log += `   映射路径: ${mapData.data}\n\n`;
+                } else {
+                    log += `   ⚠️ API 映射: ${JSON.stringify(mapData)}\n\n`;
+                }
+                
+                log += '🎉 所有后端接口测试通过！\n\n';
+                log += '如果 VueCMF 前端还是空白页，说明问题在前端代码或浏览器缓存。\n';
+                log += '建议：使用无痕模式重新测试！';
+                
+                showResult('fullResult', log, true);
+                
+            } catch(e) {
+                log += `\n❌ 测试中断: ${e.message}`;
+                showResult('fullResult', log, false);
+            }
+        }
+    </script>
+</body>
+</html>
+

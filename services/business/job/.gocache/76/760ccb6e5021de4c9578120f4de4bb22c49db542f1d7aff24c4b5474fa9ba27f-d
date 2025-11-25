@@ -1,0 +1,4 @@
+./graph.go
+./invalid.go
+./spatial.go
+./temporal.go

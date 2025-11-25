@@ -1,0 +1,18 @@
+go 1.23
+
+use (
+	./services/business/company
+	./services/business/job
+	./services/business/resume
+	./services/core/auth
+	./services/core/user
+	./services/infrastructure/banner
+	./services/infrastructure/blockchain
+	./services/infrastructure/notification
+	./services/infrastructure/statistics
+	./services/infrastructure/template
+	./shared/central-brain
+	./shared/core
+)
+
+replace github.com/szjason72/zervigo/shared/core => ./shared/core

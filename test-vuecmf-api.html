@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>VueCMF API测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h1 { color: #333; border-bottom: 2px solid #409EFF; padding-bottom: 10px; }
+        .test-section { margin: 20px 0; padding: 15px; background: #f9f9f9; border-radius: 4px; }
+        .test-section h3 { color: #409EFF; margin-top: 0; }
+        button { background: #409EFF; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #66b1ff; }
+        pre { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+        .success { color: #67C23A; font-weight: bold; }
+        .error { color: #F56C6C; font-weight: bold; }
+        .info { color: #409EFF; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 VueCMF API 测试工具</h1>
+        
+        <div class="test-section">
+            <h3>1. 测试菜单API</h3>
+            <button onclick="testMenuAPI()">测试菜单API</button>
+            <pre id="menu-result">点击按钮开始测试...</pre>
+        </div>
+
+        <div class="test-section">
+            <h3>2. 测试用户管理API</h3>
+            <button onclick="testAdminAPI()">测试用户列表</button>
+            <button onclick="testAdminFields()">获取字段定义</button>
+            <pre id="admin-result">点击按钮开始测试...</pre>
+        </div>
+
+        <div class="test-section">
+            <h3>3. 测试角色管理API</h3>
+            <button onclick="testRolesAPI()">测试角色列表</button>
+            <pre id="roles-result">点击按钮开始测试...</pre>
+        </div>
+
+        <div class="test-section">
+            <h3>4. 测试权限管理API</h3>
+            <button onclick="testPermissionsAPI()">测试权限列表</button>
+            <pre id="permissions-result">点击按钮开始测试...</pre>
+        </div>
+
+        <div class="test-section">
+            <h3>5. 测试模型配置API（VueCMF标准）</h3>
+            <button onclick="testModelConfigAPI()">测试模型配置</button>
+            <button onclick="testModelFieldAPI()">测试字段配置</button>
+            <pre id="model-result">点击按钮开始测试...</pre>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:9000';
+        const token = localStorage.getItem('vuecmf_token') || '';
+
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            const typeClass = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+            element.innerHTML = `<span class="${typeClass}">[${timestamp}] ${message}</span>`;
+        }
+
+        function logJSON(elementId, data, message = '') {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            element.innerHTML = `<span class="info">[${timestamp}] ${message}</span>\n${JSON.stringify(data, null, 2)}`;
+        }
+
+        async function testMenuAPI() {
+            log('menu-result', '🔄 测试中...');
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/menu/nav`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: { username: 'admin' } })
+                });
+                const data = await response.json();
+                logJSON('menu-result', data, `✅ 状态码: ${response.status}, 菜单数量: ${Object.keys(data.data?.nav_menu || {}).length}`);
+            } catch (error) {
+                log('menu-result', `❌ 错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAdminAPI() {
+            log('admin-result', '🔄 测试中...');
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/admin/index`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        data: {
+                            table_name: 'admin',
+                            page: 1,
+                            page_size: 20
+                        }
+                    })
+                });
+                const data = await response.json();
+                logJSON('admin-result', data, `✅ 状态码: ${response.status}, 数据总数: ${data.data?.total || 0}, 当前页: ${data.data?.list?.length || 0}条`);
+            } catch (error) {
+                log('admin-result', `❌ 错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAdminFields() {
+            log('admin-result', '🔄 测试中...');
+            try {
+                // 尝试VueCMF标准的字段获取API
+                const response = await fetch(`${API_BASE}/api/v1/model_field/index`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        data: {
+                            filter: [{field: 'table_name', condition: '=', value: 'admin'}],
+                            page: 1,
+                            page_size: 100
+                        }
+                    })
+                });
+                const data = await response.json();
+                logJSON('admin-result', data, `✅ 状态码: ${response.status}, 字段数: ${data.data?.list?.length || 0}`);
+            } catch (error) {
+                log('admin-result', `❌ 错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testRolesAPI() {
+            log('roles-result', '🔄 测试中...');
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/roles/index`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        data: {
+                            table_name: 'roles',
+                            page: 1,
+                            page_size: 20
+                        }
+                    })
+                });
+                const data = await response.json();
+                logJSON('roles-result', data, `✅ 状态码: ${response.status}, 数据总数: ${data.data?.total || 0}`);
+            } catch (error) {
+                log('roles-result', `❌ 错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testPermissionsAPI() {
+            log('permissions-result', '🔄 测试中...');
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/permissions/index`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        data: {
+                            table_name: 'permissions',
+                            page: 1,
+                            page_size: 20
+                        }
+                    })
+                });
+                const data = await response.json();
+                logJSON('permissions-result', data, `✅ 状态码: ${response.status}, 数据总数: ${data.data?.total || 0}`);
+            } catch (error) {
+                log('permissions-result', `❌ 错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testModelConfigAPI() {
+            log('model-result', '🔄 测试中...');
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/model_config/index`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        data: {
+                            page: 1,
+                            page_size: 20
+                        }
+                    })
+                });
+                const data = await response.json();
+                logJSON('model-result', data, `VueCMF模型配置 - 状态码: ${response.status}`);
+            } catch (error) {
+                log('model-result', `❌ 错误: ${error.message}`, 'error');
+            }
+        }
+
+        async function testModelFieldAPI() {
+            log('model-result', '🔄 测试中...');
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/model_field/index`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        data: {
+                            filter: [{field: 'table_name', condition: '=', value: 'admin'}],
+                            page: 1,
+                            page_size: 100
+                        }
+                    })
+                });
+                const data = await response.json();
+                logJSON('model-result', data, `字段配置 - 状态码: ${response.status}`);
+            } catch (error) {
+                log('model-result', `❌ 错误: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时显示token状态
+        window.addEventListener('load', () => {
+            if (token) {
+                console.log('✅ 已找到token:', token.substring(0, 20) + '...');
+            } else {
+                console.warn('⚠️ 未找到token，请先登录');
+            }
+        });
+    </script>
+</body>
+</html>
+

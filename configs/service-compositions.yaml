@@ -1,0 +1,110 @@
+# 服务组合定义
+# 用于智能中央大脑自动选择服务组合
+
+compositions:
+  # ============================================
+  # 单个服务组合 (3种)
+  # ============================================
+  
+  job_only:
+    name: job_only
+    display_name: "只启动职位服务"
+    description: "适合职位功能开发/测试"
+    target_services:
+      - job-service
+    auto_start_required: true
+    enabled: true
+  
+  resume_only:
+    name: resume_only
+    display_name: "只启动简历服务"
+    description: "适合简历功能开发/测试"
+    target_services:
+      - resume-service
+    auto_start_required: true
+    enabled: true
+  
+  company_only:
+    name: company_only
+    display_name: "只启动企业服务"
+    description: "适合企业功能开发/测试"
+    target_services:
+      - company-service
+    auto_start_required: true
+    enabled: true
+  
+  # ============================================
+  # 两个服务组合 (3种)
+  # ============================================
+  
+  job_resume:
+    name: job_resume
+    display_name: "职位 + 简历服务"
+    description: "职位和简历功能集成测试"
+    target_services:
+      - job-service
+      - resume-service
+    auto_start_required: true
+    enabled: true
+  
+  job_company:
+    name: job_company
+    display_name: "职位 + 企业服务"
+    description: "职位和企业功能集成测试"
+    target_services:
+      - job-service
+      - company-service
+    auto_start_required: true
+    enabled: true
+  
+  resume_company:
+    name: resume_company
+    display_name: "简历 + 企业服务"
+    description: "简历和企业功能集成测试"
+    target_services:
+      - resume-service
+      - company-service
+    auto_start_required: true
+    enabled: true
+  
+  # ============================================
+  # 所有服务组合 (1种)
+  # ============================================
+  
+  all_services:
+    name: all_services
+    display_name: "全部服务"
+    description: "启动所有业务服务，完整系统"
+    target_services:
+      - job-service
+      - resume-service
+      - company-service
+    auto_start_required: true
+    enabled: true
+  
+  # ============================================
+  # 特殊组合
+  # ============================================
+  
+  minimal:
+    name: minimal
+    display_name: "最小化启动"
+    description: "只启动基础设施服务"
+    target_services:
+      - auth-service
+      - user-service
+    auto_start_required: false
+    enabled: true
+  
+  with_ai:
+    name: with_ai
+    display_name: "包含AI服务"
+    description: "启动所有服务 + AI服务"
+    target_services:
+      - job-service
+      - resume-service
+      - company-service
+      - ai-service
+    auto_start_required: true
+    enabled: true
+

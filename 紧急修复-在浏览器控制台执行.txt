@@ -1,0 +1,73 @@
+===============================================
+🚨 紧急修复 - 请在VueCMF页面控制台执行
+===============================================
+
+打开 http://localhost:8081
+按 F12 打开控制台
+复制粘贴下面的代码并按回车：
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+console.clear();
+console.log('🔧 开始修复...\n');
+
+// 1. 完全清除缓存
+console.log('1️⃣ 清除所有缓存...');
+localStorage.clear();
+sessionStorage.clear();
+console.log('   ✅ 完成\n');
+
+// 2. 重新登录（可能需要）
+console.log('2️⃣ 检查登录状态...');
+const currentToken = localStorage.getItem('vuecmf_token');
+if (!currentToken) {
+  console.log('   ⚠️  需要重新登录');
+  console.log('   请刷新页面并使用 admin/admin123 登录\n');
+  setTimeout(() => location.reload(), 2000);
+} else {
+  console.log('   ✅ 已登录\n');
+  
+  // 3. 重新获取菜单
+  console.log('3️⃣ 重新获取菜单和API映射...');
+  fetch('http://localhost:9000/api/v1/menu/nav', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({data: {username: 'admin'}})
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.code === 0) {
+      console.log('   ✅ 获取成功\n');
+      
+      // 保存到localStorage
+      localStorage.setItem('vuecmf_menu', JSON.stringify(data.data.nav_menu));
+      localStorage.setItem('vuecmf_api_maps', JSON.stringify(data.data.api_maps));
+      
+      console.log('4️⃣ API映射已更新:');
+      console.log('   用户:', data.data.api_maps.admin?.index);
+      console.log('   角色:', data.data.api_maps.roles?.index);
+      console.log('   权限:', data.data.api_maps.permissions?.index);
+      
+      console.log('\n✅ 修复完成！3秒后刷新页面...');
+      setTimeout(() => location.reload(), 3000);
+    } else {
+      console.error('❌ 获取菜单失败:', data.message);
+    }
+  })
+  .catch(err => console.error('❌ 请求失败:', err));
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+执行后：
+1. 等待提示"修复完成"
+2. 页面自动刷新
+3. 重新点击"系统管理" -> "角色管理"
+4. 应该能看到数据了
+
+如果还不行，请检查"网络"标签中的请求！
+
+
+
+
+
