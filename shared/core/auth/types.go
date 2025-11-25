@@ -134,3 +134,110 @@ type AuthConfig struct {
 	MaxLoginAttempts int           `json:"max_login_attempts"`
 	LockoutDuration  time.Duration `json:"lockout_duration"`
 }
+
+// OAuth2Client OAuth2 客户端
+type OAuth2Client struct {
+	ID           string    `json:"id" gorm:"primaryKey;column:id;type:varchar(255)"`
+	Secret       string    `json:"-" gorm:"column:client_secret;type:varchar(255);not null"`
+	Name         string    `json:"name" gorm:"column:name;type:varchar(255);not null"`
+	RedirectURIs []string  `json:"redirect_uris" gorm:"column:redirect_uris;type:jsonb;default:'[]'"`
+	Scopes       []string  `json:"scopes" gorm:"column:scopes;type:jsonb;default:'[]'"`
+	Status       string    `json:"status" gorm:"column:status;type:varchar(50);default:'active'"`
+	CreatedAt    time.Time `json:"created_at" gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt    time.Time `json:"updated_at" gorm:"column:updated_at;autoUpdateTime"`
+}
+
+// TableName 指定表名
+func (OAuth2Client) TableName() string {
+	return "oauth2_clients"
+}
+
+// AuthorizationCode 授权码
+type AuthorizationCode struct {
+	Code                string    `json:"code" gorm:"primaryKey;column:code;type:varchar(255)"`
+	ClientID            string    `json:"client_id" gorm:"column:client_id;type:varchar(255);not null;index"`
+	UserID              uint      `json:"user_id" gorm:"column:user_id;not null;index"`
+	RedirectURI         string    `json:"redirect_uri" gorm:"column:redirect_uri;type:varchar(512);not null"`
+	Scope               string    `json:"scope" gorm:"column:scope;type:varchar(255)"`
+	CodeChallenge       string    `json:"code_challenge" gorm:"column:code_challenge;type:varchar(255)"`
+	CodeChallengeMethod string    `json:"code_challenge_method" gorm:"column:code_challenge_method;type:varchar(10)"`
+	ExpiresAt           time.Time `json:"expires_at" gorm:"column:expires_at;not null;index"`
+	CreatedAt           time.Time `json:"created_at" gorm:"column:created_at;autoCreateTime"`
+}
+
+// TableName 指定表名
+func (AuthorizationCode) TableName() string {
+	return "oauth2_authorization_codes"
+}
+
+// RefreshToken 刷新令牌
+type RefreshToken struct {
+	Token     string     `json:"token" gorm:"primaryKey;column:token;type:varchar(255)"`
+	ClientID  string     `json:"client_id" gorm:"column:client_id;type:varchar(255);not null;index"`
+	UserID    uint       `json:"user_id" gorm:"column:user_id;not null;index"`
+	Scope     string     `json:"scope" gorm:"column:scope;type:varchar(255)"`
+	ExpiresAt time.Time  `json:"expires_at" gorm:"column:expires_at;not null;index"`
+	CreatedAt time.Time  `json:"created_at" gorm:"column:created_at;autoCreateTime"`
+	RevokedAt *time.Time `json:"revoked_at" gorm:"column:revoked_at;index"`
+}
+
+// TableName 指定表名
+func (RefreshToken) TableName() string {
+	return "oauth2_refresh_tokens"
+}
+
+// AccessToken 访问令牌（可选，如果使用数据库存储）
+type AccessToken struct {
+	Token     string     `json:"token" gorm:"primaryKey;column:token;type:varchar(255)"`
+	ClientID  string     `json:"client_id" gorm:"column:client_id;type:varchar(255);not null;index"`
+	UserID    uint       `json:"user_id" gorm:"column:user_id;not null;index"`
+	Scope     string     `json:"scope" gorm:"column:scope;type:varchar(255)"`
+	ExpiresAt time.Time  `json:"expires_at" gorm:"column:expires_at;not null;index"`
+	CreatedAt time.Time  `json:"created_at" gorm:"column:created_at;autoCreateTime"`
+	RevokedAt *time.Time `json:"revoked_at" gorm:"column:revoked_at;index"`
+}
+
+// TableName 指定表名
+func (AccessToken) TableName() string {
+	return "oauth2_access_tokens"
+}
+
+// OAuth2AuthorizationRequest 授权请求
+type OAuth2AuthorizationRequest struct {
+	ClientID     string `json:"client_id" binding:"required"`
+	RedirectURI  string `json:"redirect_uri" binding:"required"`
+	ResponseType string `json:"response_type" binding:"required"` // "code" for authorization code flow
+	Scope        string `json:"scope"`
+	State        string `json:"state"`
+	CodeChallenge       string `json:"code_challenge"`        // PKCE
+	CodeChallengeMethod string `json:"code_challenge_method"` // "plain" or "S256"
+}
+
+// OAuth2TokenRequest Token 请求
+type OAuth2TokenRequest struct {
+	GrantType    string `json:"grant_type" binding:"required"` // "authorization_code" or "refresh_token"
+	Code         string `json:"code"`                          // for authorization_code grant
+	RedirectURI  string `json:"redirect_uri"`                  // for authorization_code grant
+	ClientID     string `json:"client_id" binding:"required"`
+	ClientSecret string `json:"client_secret" binding:"required"`
+	RefreshToken string `json:"refresh_token"`                 // for refresh_token grant
+	CodeVerifier string `json:"code_verifier"`                  // PKCE
+}
+
+// OAuth2TokenResponse Token 响应
+type OAuth2TokenResponse struct {
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"` // "Bearer"
+	ExpiresIn    int64  `json:"expires_in"` // seconds
+	RefreshToken string `json:"refresh_token,omitempty"`
+	Scope        string `json:"scope,omitempty"`
+}
+
+// OAuth2UserInfoResponse 用户信息响应
+type OAuth2UserInfoResponse struct {
+	Sub           string `json:"sub"`           // Subject (user ID)
+	Name          string `json:"name"`          // Username
+	Email         string `json:"email"`         // Email
+	EmailVerified bool   `json:"email_verified"` // Email verified
+	Picture       string `json:"picture,omitempty"`
+}
