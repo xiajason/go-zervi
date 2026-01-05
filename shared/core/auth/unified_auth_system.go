@@ -93,6 +93,7 @@ type UserInfo struct {
 	SubscriptionType   *string    `json:"subscription_type" db:"subscription_type"`
 	SubscriptionExpiry *time.Time `json:"subscription_expiry" db:"subscription_expires_at"`
 	LastLogin          *time.Time `json:"last_login" db:"last_login_at"`
+	TenantID           int64      `json:"tenant_id" db:"tenant_id"` // 租户ID
 	CreatedAt          *time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt          *time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -104,6 +105,7 @@ type JWTClaims struct {
 	Email       string   `json:"email"`
 	Role        string   `json:"role"`
 	Level       int      `json:"level"`
+	TenantID    int64    `json:"tenant_id"` // 租户ID
 	Permissions []string `json:"permissions"`
 	jwt.RegisteredClaims
 }
@@ -699,6 +701,18 @@ func (uas *UnifiedAuthSystem) ValidateJWT(tokenString string) (*AuthResult, erro
 		}, nil
 	}
 
+	// 检查Token是否被全局失效
+	if claims.IssuedAt != nil {
+		tokenIssuedAt := claims.IssuedAt.Unix()
+		if !IsTokenValid(tokenIssuedAt) {
+			return &AuthResult{
+				Success:   false,
+				Error:     "token已被失效，请重新登录",
+				ErrorCode: "TOKEN_INVALIDATED",
+			}, nil
+		}
+	}
+
 	// 获取用户信息
 	user, err := uas.getUserByID(claims.UserID)
 	if err != nil {
@@ -866,6 +880,7 @@ func (uas *UnifiedAuthSystem) generateJWT(user *UserInfo, permissions []string) 
 		Email:       user.Email,
 		Role:        user.Role,
 		Level:       roleInfo.Level,
+		TenantID:    user.TenantID, // 添加租户ID到JWT Claims
 		Permissions: permissions,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(168 * time.Hour)), // 7天，适配测试需要

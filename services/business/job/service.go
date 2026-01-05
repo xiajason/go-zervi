@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+	"github.com/szjason72/zervigo/shared/core/context"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -27,7 +28,7 @@ func NewJobService(db *gorm.DB) *JobService {
 	}
 }
 
-// ListJobs 返回分页后的职位列表
+// ListJobs 返回分页后的职位列表（自动过滤租户）
 func (s *JobService) ListJobs(ctx context.Context, filter JobFilter) (JobListResult, error) {
 	if filter.Page <= 0 {
 		filter.Page = 1
@@ -36,7 +37,14 @@ func (s *JobService) ListJobs(ctx context.Context, filter JobFilter) (JobListRes
 		filter.PageSize = 20
 	}
 
-	query := s.db.WithContext(ctx).Model(&Job{})
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(ctx)
+	if err != nil {
+		// 如果没有租户ID，使用默认租户
+		tenantID = 1
+	}
+
+	query := s.db.WithContext(ctx).Model(&Job{}).Where("tenant_id = ?", tenantID)
 
 	if filter.Keyword != "" {
 		keyword := "%" + strings.ToLower(filter.Keyword) + "%"
@@ -112,18 +120,31 @@ func (s *JobService) ListJobs(ctx context.Context, filter JobFilter) (JobListRes
 	}, nil
 }
 
-// GetJob 获取职位详情
+// GetJob 获取职位详情（自动过滤租户）
 func (s *JobService) GetJob(ctx context.Context, id uint) (JobDetail, error) {
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(ctx)
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
 	var job Job
-	if err := s.db.WithContext(ctx).First(&job, id).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("id = ? AND tenant_id = ?", id, tenantID).First(&job).Error; err != nil {
 		return JobDetail{}, err
 	}
 	return job.toDetail(), nil
 }
 
-// CreateJob 创建新职位
+// CreateJob 创建新职位（自动设置租户ID）
 func (s *JobService) CreateJob(ctx context.Context, req CreateJobRequest) (JobDetail, error) {
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(ctx)
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
 	job := Job{
+		TenantID:           tenantID, // 自动设置租户ID
 		Title:              req.Title,
 		Description:        req.Description,
 		Requirements:       req.Requirements,
@@ -168,10 +189,16 @@ func (s *JobService) CreateJob(ctx context.Context, req CreateJobRequest) (JobDe
 	return job.toDetail(), nil
 }
 
-// UpdateJob 更新职位
+// UpdateJob 更新职位（自动校验租户ID）
 func (s *JobService) UpdateJob(ctx context.Context, id uint, req UpdateJobRequest) (JobDetail, error) {
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(ctx)
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
 	var job Job
-	if err := s.db.WithContext(ctx).First(&job, id).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where("id = ? AND tenant_id = ?", id, tenantID).First(&job).Error; err != nil {
 		return JobDetail{}, err
 	}
 
@@ -269,8 +296,14 @@ func (s *JobService) ToggleFavorite(ctx context.Context, userID, jobID uint, fav
 
 // EnsureSeedData 注入默认职位数据
 func (s *JobService) EnsureSeedData(ctx context.Context) error {
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(ctx)
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
 	var count int64
-	if err := s.db.WithContext(ctx).Model(&Job{}).Count(&count).Error; err != nil {
+	if err := s.db.WithContext(ctx).Model(&Job{}).Where("tenant_id = ?", tenantID).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
@@ -280,6 +313,7 @@ func (s *JobService) EnsureSeedData(ctx context.Context) error {
 	now := time.Now()
 	seedJobs := []Job{
 		{
+			TenantID:           tenantID, // 设置租户ID
 			Title:              "资深后端工程师",
 			Description:        "负责核心微服务的设计与实现，参与架构评审和性能优化。",
 			Requirements:       "精通 Go 语言，熟悉微服务架构，具备数据库优化经验。",
@@ -301,6 +335,7 @@ func (s *JobService) EnsureSeedData(ctx context.Context) error {
 			PublishAt:          &now,
 		},
 		{
+			TenantID:           tenantID, // 设置租户ID
 			Title:              "前端开发工程师",
 			Description:        "负责跨端产品的前端开发，配合设计与后端完成需求交付。",
 			Requirements:       "熟悉 React/Taro，掌握 TypeScript，具备组件化开发经验。",
@@ -322,6 +357,7 @@ func (s *JobService) EnsureSeedData(ctx context.Context) error {
 			PublishAt:          &now,
 		},
 		{
+			TenantID:           tenantID, // 设置租户ID
 			Title:              "数据分析师",
 			Description:        "负责招聘数据分析，搭建数据指标体系，为业务决策提供支持。",
 			Requirements:       "熟练使用 SQL、Python，具备数据建模与可视化经验。",

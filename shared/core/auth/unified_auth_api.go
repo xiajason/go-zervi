@@ -48,6 +48,11 @@ func (api *UnifiedAuthAPI) Start() error {
 	http.HandleFunc("/api/v1/auth/service/validate", api.handleServiceValidate)
 	http.HandleFunc("/api/v1/auth/service/permission", api.handleServicePermission)
 
+	// Token失效管理路由
+	invalidationAPI := NewInvalidationAPI(api.authSystem)
+	http.HandleFunc("/api/v1/auth/invalidate-all", invalidationAPI.HandleInvalidateAllTokens)
+	http.HandleFunc("/api/v1/auth/invalidation-time", invalidationAPI.HandleGetInvalidationTime)
+
 	http.HandleFunc("/health", api.handleHealth)
 
 	// 启动服务器
@@ -164,6 +169,9 @@ func (api *UnifiedAuthAPI) handleLogin(w http.ResponseWriter, r *http.Request) {
 			"accessToken":  result.Token,
 			"refreshToken": "",
 		}
+		// 设置安全Cookie
+		SetSecureCookie(w, DefaultCookieConfig(), result.Token)
+		
 		api.writeSuccessResponse(w, response.Success("登录成功", loginData))
 	} else {
 		// 使用result中的错误信息
@@ -210,9 +218,15 @@ func (api *UnifiedAuthAPI) handleLogout(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// 使所有Token失效（全局失效）
+	InvalidateAllTokens()
+
+	// 删除安全Cookie
+	DeleteSecureCookie(w, DefaultCookieConfig())
+
 	// 返回成功（VueCMF 格式）
 	api.writeSuccessResponse(w, response.Success("登出成功", map[string]interface{}{
-		"message": "已成功登出",
+		"message": "已成功登出，所有Token已失效",
 	}))
 }
 

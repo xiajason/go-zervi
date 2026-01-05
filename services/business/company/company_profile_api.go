@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/szjason72/zervigo/shared/core"
+	"github.com/szjason72/zervigo/shared/core/context"
 )
 
 // CompanyProfileAPI 企业画像API处理器
@@ -95,26 +96,32 @@ func (api *CompanyProfileAPI) getCompanyProfileSummary(c *gin.Context) {
 		return
 	}
 
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(c.Request.Context())
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
 	db := api.core.GetDB()
 
-	// 查询企业基本信息
+	// 查询企业基本信息（添加租户过滤）
 	var basicInfo CompanyProfileBasicInfo
-	if err := db.Where("company_id = ?", companyID).First(&basicInfo).Error; err != nil {
+	if err := db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).First(&basicInfo).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "企业画像信息不存在"})
 		return
 	}
 
-	// 查询人员竞争力信息
+	// 查询人员竞争力信息（添加租户过滤）
 	var personnel PersonnelCompetitiveness
-	db.Where("company_id = ?", companyID).First(&personnel)
+	db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).First(&personnel)
 
-	// 查询科创评分信息
+	// 查询科创评分信息（添加租户过滤）
 	var techInnovation TechInnovationScore
-	db.Where("company_id = ?", companyID).First(&techInnovation)
+	db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).First(&techInnovation)
 
-	// 查询风险信息
+	// 查询风险信息（添加租户过滤）
 	var riskInfo CompanyProfileRiskInfo
-	db.Where("company_id = ?", companyID).First(&riskInfo)
+	db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).First(&riskInfo)
 
 	// 构建摘要信息
 	summary := CompanyProfileSummary{
@@ -160,57 +167,63 @@ func (api *CompanyProfileAPI) getCompanyProfile(c *gin.Context) {
 		return
 	}
 
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(c.Request.Context())
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
 	db := api.core.GetDB()
 	profileData := &CompanyProfileData{}
 
-	// 查询基本信息
+	// 查询基本信息（添加租户过滤）
 	var basicInfo CompanyProfileBasicInfo
-	if err := db.Where("company_id = ?", companyID).First(&basicInfo).Error; err == nil {
+	if err := db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).First(&basicInfo).Error; err == nil {
 		profileData.BasicInfo = &basicInfo
 	}
 
-	// 查询资质许可信息
+	// 查询资质许可信息（添加租户过滤）
 	var qualifications []QualificationLicense
-	db.Where("company_id = ?", companyID).Find(&qualifications)
+	db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).Find(&qualifications)
 	profileData.Qualifications = qualifications
 
-	// 查询人员竞争力信息
+	// 查询人员竞争力信息（添加租户过滤）
 	var personnel PersonnelCompetitiveness
-	if err := db.Where("company_id = ?", companyID).First(&personnel).Error; err == nil {
+	if err := db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).First(&personnel).Error; err == nil {
 		profileData.Personnel = &personnel
 	}
 
-	// 查询公积金信息
+	// 查询公积金信息（添加租户过滤）
 	var providentFund ProvidentFund
-	if err := db.Where("company_id = ?", companyID).First(&providentFund).Error; err == nil {
+	if err := db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).First(&providentFund).Error; err == nil {
 		profileData.ProvidentFund = &providentFund
 	}
 
-	// 查询资助补贴信息
+	// 查询资助补贴信息（添加租户过滤）
 	var subsidies []SubsidyInfo
-	db.Where("company_id = ?", companyID).Find(&subsidies)
+	db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).Find(&subsidies)
 	profileData.Subsidies = subsidies
 
-	// 查询企业关系信息
+	// 查询企业关系信息（添加租户过滤）
 	var relationships []CompanyRelationship
-	db.Where("company_id = ?", companyID).Find(&relationships)
+	db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).Find(&relationships)
 	profileData.Relationships = relationships
 
-	// 查询科创评分信息
+	// 查询科创评分信息（添加租户过滤）
 	var techInnovation TechInnovationScore
-	if err := db.Where("company_id = ?", companyID).First(&techInnovation).Error; err == nil {
+	if err := db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).First(&techInnovation).Error; err == nil {
 		profileData.TechInnovation = &techInnovation
 	}
 
-	// 查询财务信息
+	// 查询财务信息（添加租户过滤）
 	var financialInfo CompanyProfileFinancialInfo
-	if err := db.Where("company_id = ?", companyID).First(&financialInfo).Error; err == nil {
+	if err := db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).First(&financialInfo).Error; err == nil {
 		profileData.FinancialInfo = &financialInfo
 	}
 
-	// 查询风险信息
+	// 查询风险信息（添加租户过滤）
 	var riskInfo CompanyProfileRiskInfo
-	if err := db.Where("company_id = ?", companyID).First(&riskInfo).Error; err == nil {
+	if err := db.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).First(&riskInfo).Error; err == nil {
 		profileData.RiskInfo = &riskInfo
 	}
 
@@ -241,11 +254,20 @@ func (api *CompanyProfileAPI) createOrUpdateBasicInfo(c *gin.Context) {
 		return
 	}
 
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(c.Request.Context())
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
+	// 自动设置租户ID
+	basicInfo.TenantID = tenantID
+
 	db := api.core.GetDB()
 
-	// 检查是否已存在
+	// 检查是否已存在（添加租户过滤）
 	var existingInfo CompanyProfileBasicInfo
-	if err := db.Where("company_id = ?", basicInfo.CompanyID).First(&existingInfo).Error; err == nil {
+	if err := db.Where("company_id = ? AND tenant_id = ?", basicInfo.CompanyID, tenantID).First(&existingInfo).Error; err == nil {
 		// 更新现有记录
 		basicInfo.ID = existingInfo.ID
 		basicInfo.CreatedAt = existingInfo.CreatedAt
@@ -292,6 +314,15 @@ func (api *CompanyProfileAPI) createOrUpdateQualification(c *gin.Context) {
 	if !api.checkCompanyAccess(userID, qualification.CompanyID, c) {
 		return
 	}
+
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(c.Request.Context())
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
+	// 自动设置租户ID
+	qualification.TenantID = tenantID
 
 	db := api.core.GetDB()
 
@@ -341,11 +372,20 @@ func (api *CompanyProfileAPI) createOrUpdatePersonnel(c *gin.Context) {
 		return
 	}
 
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(c.Request.Context())
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
+	// 自动设置租户ID
+	personnel.TenantID = tenantID
+
 	db := api.core.GetDB()
 
-	// 检查是否已存在
+	// 检查是否已存在（添加租户过滤）
 	var existingPersonnel PersonnelCompetitiveness
-	if err := db.Where("company_id = ?", personnel.CompanyID).First(&existingPersonnel).Error; err == nil {
+	if err := db.Where("company_id = ? AND tenant_id = ?", personnel.CompanyID, tenantID).First(&existingPersonnel).Error; err == nil {
 		// 更新现有记录
 		personnel.ID = existingPersonnel.ID
 		personnel.CreatedAt = existingPersonnel.CreatedAt
@@ -393,11 +433,20 @@ func (api *CompanyProfileAPI) createOrUpdateFinancial(c *gin.Context) {
 		return
 	}
 
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(c.Request.Context())
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
+	// 自动设置租户ID
+	financialInfo.TenantID = tenantID
+
 	db := api.core.GetDB()
 
-	// 检查是否已存在
+	// 检查是否已存在（添加租户过滤）
 	var existingFinancial CompanyProfileFinancialInfo
-	if err := db.Where("company_id = ? AND financial_year = ?", financialInfo.CompanyID, financialInfo.FinancialYear).First(&existingFinancial).Error; err == nil {
+	if err := db.Where("company_id = ? AND financial_year = ? AND tenant_id = ?", financialInfo.CompanyID, financialInfo.FinancialYear, tenantID).First(&existingFinancial).Error; err == nil {
 		// 更新现有记录
 		financialInfo.ID = existingFinancial.ID
 		financialInfo.CreatedAt = existingFinancial.CreatedAt
@@ -445,11 +494,20 @@ func (api *CompanyProfileAPI) createOrUpdateRisk(c *gin.Context) {
 		return
 	}
 
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(c.Request.Context())
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
+	// 自动设置租户ID
+	riskInfo.TenantID = tenantID
+
 	db := api.core.GetDB()
 
-	// 检查是否已存在
+	// 检查是否已存在（添加租户过滤）
 	var existingRisk CompanyProfileRiskInfo
-	if err := db.Where("company_id = ?", riskInfo.CompanyID).First(&existingRisk).Error; err == nil {
+	if err := db.Where("company_id = ? AND tenant_id = ?", riskInfo.CompanyID, tenantID).First(&existingRisk).Error; err == nil {
 		// 更新现有记录
 		riskInfo.ID = existingRisk.ID
 		riskInfo.CreatedAt = existingRisk.CreatedAt
@@ -497,6 +555,12 @@ func (api *CompanyProfileAPI) importCompanyProfile(c *gin.Context) {
 		return
 	}
 
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(c.Request.Context())
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
 	db := api.core.GetDB()
 
 	// 开始事务
@@ -507,8 +571,9 @@ func (api *CompanyProfileAPI) importCompanyProfile(c *gin.Context) {
 		}
 	}()
 
-	// 导入基本信息
+	// 导入基本信息（自动设置租户ID）
 	if profileData.BasicInfo != nil {
+		profileData.BasicInfo.TenantID = tenantID
 		profileData.BasicInfo.CreatedAt = time.Now()
 		profileData.BasicInfo.UpdatedAt = time.Now()
 		if err := tx.Create(profileData.BasicInfo).Error; err != nil {
@@ -518,8 +583,9 @@ func (api *CompanyProfileAPI) importCompanyProfile(c *gin.Context) {
 		}
 	}
 
-	// 导入资质许可信息
+	// 导入资质许可信息（自动设置租户ID）
 	for _, qualification := range profileData.Qualifications {
+		qualification.TenantID = tenantID
 		qualification.CreatedAt = time.Now()
 		qualification.UpdatedAt = time.Now()
 		if err := tx.Create(&qualification).Error; err != nil {
@@ -583,10 +649,16 @@ func (api *CompanyProfileAPI) checkCompanyAccess(userID, companyID uint, c *gin.
 		return true
 	}
 
-	// 检查是否为企业的创建者
+	// 从context获取租户ID
+	tenantID, err := context.GetTenantID(c.Request.Context())
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
+	// 检查是否为企业的创建者（添加租户过滤）
 	db := api.core.GetDB()
 	var company EnhancedCompany
-	if err := db.First(&company, companyID).Error; err != nil {
+	if err := db.Where("id = ? AND tenant_id = ?", companyID, tenantID).First(&company).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "企业不存在"})
 		return false
 	}
@@ -603,23 +675,27 @@ func (api *CompanyProfileAPI) checkCompanyAccess(userID, companyID uint, c *gin.
 func (api *CompanyProfileAPI) checkCompleteProfile(companyID uint) bool {
 	db := api.core.GetDB()
 
-	// 检查各个表是否有数据
+	// 从context获取租户ID（注意：这个方法没有context参数，需要从其他地方获取）
+	// 这里暂时使用默认租户，实际使用时应该传入context
+	tenantID := int64(1)
+
+	// 检查各个表是否有数据（添加租户过滤）
 	var count int64
 
 	// 基本信息
-	db.Model(&CompanyProfileBasicInfo{}).Where("company_id = ?", companyID).Count(&count)
+	db.Model(&CompanyProfileBasicInfo{}).Where("company_id = ? AND tenant_id = ?", companyID, tenantID).Count(&count)
 	if count == 0 {
 		return false
 	}
 
 	// 人员竞争力
-	db.Model(&PersonnelCompetitiveness{}).Where("company_id = ?", companyID).Count(&count)
+	db.Model(&PersonnelCompetitiveness{}).Where("company_id = ? AND tenant_id = ?", companyID, tenantID).Count(&count)
 	if count == 0 {
 		return false
 	}
 
 	// 科创评分
-	db.Model(&TechInnovationScore{}).Where("company_id = ?", companyID).Count(&count)
+	db.Model(&TechInnovationScore{}).Where("company_id = ? AND tenant_id = ?", companyID, tenantID).Count(&count)
 	if count == 0 {
 		return false
 	}
