@@ -98,3 +98,53 @@ target/
 mysql_data/
 redis_data/
 consul_data/
+
+# Go build cache
+.gocache/
+.cache/
+**/.gocache/
+
+# Compiled binaries
+**/*-service
+**/*-service.exe
+**/main
+**/main.exe
+**/zervigo
+**/zervigo.exe
+**/central-brain
+**/central-brain.exe
+**/*.a
+
+# Air (live reload) temporary files
+tmp/
+.tmp/
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Local test files
+test-data/
+*.test.db
+
+# IDE specific
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+
+# Environment files (keep configs but ignore local env)
+*.env
+*.env.local
+!.env.example
+
+# Prototype/backup directories (keep structure but ignore large files)
+prototypes/*.zip
+prototypes/uploads*/

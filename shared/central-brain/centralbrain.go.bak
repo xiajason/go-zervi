@@ -1,0 +1,156 @@
+// registerPermissionRoutes 注册Permission Service权限管理API
+func (cb *CentralBrain) registerPermissionRoutes() {
+	// 公开API：获取所有角色列表
+	cb.router.GET("/api/v1/permission/roles", cb.getAllRoles)
+
+	// 公开API：获取所有权限列表
+	cb.router.GET("/api/v1/permission/permissions", cb.getAllPermissions)
+
+	// 需要认证的API：获取用户角色
+	cb.router.GET("/api/v1/permission/user/:userId/roles", cb.getUserRoles)
+
+	// 需要认证的API：获取用户权限
+	cb.router.GET("/api/v1/permission/user/:userId/permissions", cb.getUserPermissions)
+
+	// 需要认证的API：获取角色权限
+	cb.router.GET("/api/v1/permission/role/:roleId/permissions", cb.getRolePermissions)
+}
+
+// getAllRoles 获取所有角色列表（公开）
+func (cb *CentralBrain) getAllRoles(c *gin.Context) {
+	traceID := ""
+	if tid, exists := c.Get("trace_id"); exists {
+		traceID = tid.(string)
+	}
+
+	roles, err := cb.permissionClient.GetAllRoles()
+	if err != nil {
+		utils.WriteErrorResponse(c.Writer, http.StatusInternalServerError,
+			fmt.Sprintf("获取角色列表失败: %v", err), traceID)
+		return
+	}
+
+	utils.WriteSuccessResponse(c.Writer, "角色列表获取成功", roles, traceID)
+}
+
+// getAllPermissions 获取所有权限列表（公开）
+func (cb *CentralBrain) getAllPermissions(c *gin.Context) {
+	traceID := ""
+	if tid, exists := c.Get("trace_id"); exists {
+		traceID = tid.(string)
+	}
+
+	permissions, err := cb.permissionClient.GetAllPermissions()
+	if err != nil {
+		utils.WriteErrorResponse(c.Writer, http.StatusInternalServerError,
+			fmt.Sprintf("获取权限列表失败: %v", err), traceID)
+		return
+	}
+
+	utils.WriteSuccessResponse(c.Writer, "权限列表获取成功", permissions, traceID)
+}
+
+// getUserRoles 获取用户角色列表（需要认证）
+func (cb *CentralBrain) getUserRoles(c *gin.Context) {
+	traceID := ""
+	if tid, exists := c.Get("trace_id"); exists {
+		traceID = tid.(string)
+	}
+
+	// 提取用户token
+	userToken := cb.extractUserToken(c.Request)
+	if userToken == "" {
+		utils.WriteErrorResponse(c.Writer, http.StatusUnauthorized,
+			"未提供认证token", traceID)
+		return
+	}
+
+	// 从路径参数获取用户ID
+	userID := c.Param("userId")
+	if userID == "" {
+		utils.WriteErrorResponse(c.Writer, http.StatusBadRequest,
+			"用户ID不能为空", traceID)
+		return
+	}
+
+	roles, err := cb.permissionClient.GetUserRoles(userID)
+	if err != nil {
+		utils.WriteErrorResponse(c.Writer, http.StatusInternalServerError,
+			fmt.Sprintf("获取用户角色失败: %v", err), traceID)
+		return
+	}
+
+	utils.WriteSuccessResponse(c.Writer, "获取用户角色成功", gin.H{
+		"user_id": userID,
+		"roles":    roles,
+	}, traceID)
+}
+
+// getUserPermissions 获取用户权限列表（需要认证）
+func (cb *CentralBrain) getUserPermissions(c *gin.Context) {
+	traceID := ""
+	if tid, exists := c.Get("trace_id"); exists {
+		traceID = tid.(string)
+	}
+
+	// 提取用户token
+	userToken := cb.extractUserToken(c.Request)
+	if userToken == "" {
+		utils.WriteErrorResponse(c.Writer, http.StatusUnauthorized,
+			"未提供认证token", traceID)
+		return
+	}
+
+	// 从路径参数获取用户ID
+	userID := c.Param("userId")
+	if userID == "" {
+		utils.WriteErrorResponse(c.Writer, http.StatusBadRequest,
+			"用户ID不能为空", traceID)
+		return
+	}
+
+	permissions, err := cb.permissionClient.GetUserPermissions(userID)
+	if err != nil {
+		utils.WriteErrorResponse(c.Writer, http.StatusInternalServerError,
+			fmt.Sprintf("获取用户权限失败: %v", err), traceID)
+		return
+	}
+
+	utils.WriteSuccessResponse(c.Writer, "获取用户权限成功", permissions, traceID)
+}
+
+// getRolePermissions 获取角色权限列表（需要认证）
+func (cb *CentralBrain) getRolePermissions(c *gin.Context) {
+	traceID := ""
+	if tid, exists := c.Get("trace_id"); exists {
+		traceID = tid.(string)
+	}
+
+	// 提取用户token
+	userToken := cb.extractUserToken(c.Request)
+	if userToken == "" {
+		utils.WriteErrorResponse(c.Writer, http.StatusUnauthorized,
+			"未提供认证token", traceID)
+		return
+	}
+
+	// 从路径参数获取角色ID
+	roleID := c.Param("roleId")
+	if roleID == "" {
+		utils.WriteErrorResponse(c.Writer, http.StatusBadRequest,
+			"角色ID不能为空", traceID)
+		return
+	}
+
+	permissions, err := cb.permissionClient.GetRolePermissions(roleID)
+	if err != nil {
+		utils.WriteErrorResponse(c.Writer, http.StatusInternalServerError,
+			fmt.Sprintf("获取角色权限失败: %v", err), traceID)
+		return
+	}
+
+	utils.WriteSuccessResponse(c.Writer, "获取角色权限成功", gin.H{
+		"role_id":    roleID,
+		"permissions": permissions,
+	}, traceID)
+}
