@@ -145,6 +145,20 @@ test-data/
 *.env.local
 !.env.example
 
-# Prototype/backup directories (keep structure but ignore large files)
-prototypes/*.zip
-prototypes/uploads*/
+# Prototype/backup directories - 不推送到框架仓库
+prototypes/
+cleanup-backup/
+
+# Demo services - 这些是使用框架的示例，不是框架本身
+services/
+
+# Python services
+src/
+
+# Compiled binaries and build artifacts
+bin/
+*.jar
+*.war
+
+# Go build cache (already covered above, but ensure it's clear)
+**/.gocache/
