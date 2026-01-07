@@ -19,6 +19,8 @@ type Config struct {
 	PostgreSQL PostgreSQLConfig `json:"postgresql"`
 	// Neo4j配置
 	Neo4j Neo4jConfig `json:"neo4j"`
+	// MongoDB配置
+	MongoDB MongoDBConfig `json:"mongodb"`
 }
 
 // MySQLConfig MySQL配置
@@ -41,6 +43,7 @@ type Manager struct {
 	Redis      *RedisManager
 	PostgreSQL *PostgreSQLManager
 	Neo4j      *Neo4jManager
+	MongoDB    *MongoDBManager
 	config     Config
 }
 
@@ -86,6 +89,15 @@ func NewManager(config Config) (*Manager, error) {
 		manager.Neo4j = neo4jManager
 	}
 
+	// 初始化MongoDB
+	if config.MongoDB.URL != "" {
+		mongoManager, err := NewMongoDBManager(config.MongoDB)
+		if err != nil {
+			return nil, fmt.Errorf("初始化MongoDB失败: %w", err)
+		}
+		manager.MongoDB = mongoManager
+	}
+
 	return manager, nil
 }
 
@@ -120,6 +132,11 @@ func (dm *Manager) GetNeo4j() *Neo4jManager {
 	return dm.Neo4j
 }
 
+// GetMongoDB 获取MongoDB管理器
+func (dm *Manager) GetMongoDB() *MongoDBManager {
+	return dm.MongoDB
+}
+
 // Close 关闭所有数据库连接
 func (dm *Manager) Close() error {
 	var errors []error
@@ -147,6 +164,12 @@ func (dm *Manager) Close() error {
 		defer cancel()
 		if err := dm.Neo4j.Close(ctx); err != nil {
 			errors = append(errors, fmt.Errorf("关闭Neo4j失败: %w", err))
+		}
+	}
+
+	if dm.MongoDB != nil {
+		if err := dm.MongoDB.Close(); err != nil {
+			errors = append(errors, fmt.Errorf("关闭MongoDB失败: %w", err))
 		}
 	}
 
@@ -186,6 +209,12 @@ func (dm *Manager) Ping() error {
 		defer cancel()
 		if err := dm.Neo4j.Ping(ctx); err != nil {
 			errors = append(errors, fmt.Errorf("Neo4j连接失败: %w", err))
+		}
+	}
+
+	if dm.MongoDB != nil {
+		if err := dm.MongoDB.Ping(); err != nil {
+			errors = append(errors, fmt.Errorf("MongoDB连接失败: %w", err))
 		}
 	}
 
@@ -331,6 +360,11 @@ func (dm *Manager) Health() map[string]interface{} {
 	// 检查Neo4j
 	if dm.Neo4j != nil {
 		health["neo4j"] = dm.Neo4j.Health()
+	}
+
+	// 检查MongoDB
+	if dm.MongoDB != nil {
+		health["mongodb"] = dm.MongoDB.Health()
 	}
 
 	// 计算总体状态

@@ -1,0 +1,3 @@
+./lock.go
+./reader.go
+./writer.go

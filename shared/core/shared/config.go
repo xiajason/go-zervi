@@ -66,6 +66,13 @@ type Config struct {
 			DB       int
 			Enabled  bool
 		}
+
+		// MongoDB配置
+		MongoDB struct {
+			URL      string // mongodb://host:port 或 mongodb+srv://host
+			Database string
+			Enabled  bool
+		}
 	}
 
 	// 数据库检查配置
@@ -107,6 +114,9 @@ func GetDefaultConfig() *Config {
 	if config.Database.URL == "" {
 		config.Database.URL = getEnvString("REDIS_URL", "")
 	}
+	if config.Database.URL == "" {
+		config.Database.URL = getEnvString("MONGODB_URL", "")
+	}
 
 	// PostgreSQL配置
 	config.Database.PostgreSQL.Host = getEnvString("POSTGRESQL_HOST", "")
@@ -131,6 +141,11 @@ func GetDefaultConfig() *Config {
 	config.Database.Redis.Password = getEnvString("REDIS_PASSWORD", "")
 	config.Database.Redis.DB = getEnvInt("REDIS_DB", 0)
 	config.Database.Redis.Enabled = config.Database.Redis.Host != ""
+
+	// MongoDB配置
+	config.Database.MongoDB.URL = getEnvString("MONGODB_URL", "")
+	config.Database.MongoDB.Database = getEnvString("MONGODB_DATABASE", "")
+	config.Database.MongoDB.Enabled = config.Database.MongoDB.URL != ""
 
 	// 数据库检查配置
 	config.DatabaseCheck.Enabled = getEnvBool("DATABASE_CHECK_ENABLED", true)

@@ -34,6 +34,7 @@ func NewUnifiedAuthAPI(authSystem *UnifiedAuthSystem, port int) *UnifiedAuthAPI 
 func (api *UnifiedAuthAPI) Start() error {
 	// 用户认证路由（使用jobfirst-2024密钥）
 	http.HandleFunc("/api/v1/auth/login", api.handleLogin)
+	http.HandleFunc("/api/v1/auth/logout", api.handleLogout)
 	http.HandleFunc("/api/v1/auth/validate", api.handleValidateJWT)
 	http.HandleFunc("/api/v1/auth/permission", api.handleCheckPermission)
 	http.HandleFunc("/api/v1/auth/user", api.handleGetUser)
@@ -62,22 +63,42 @@ func (api *UnifiedAuthAPI) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// 支持两种格式：
+	// 1. 标准格式: {"username": "admin", "password": "123"}
+	// 2. VueCMF格式: {"data": {"login_name": "admin", "password": "123"}}
+	var reqBody map[string]interface{}
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
 		api.writeErrorResponse(w, response.Error(response.CodeInvalidParams, "Invalid JSON"))
 		return
 	}
 
-	if req.Username == "" || req.Password == "" {
+	var username, password string
+
+	// 检查是否是 VueCMF 格式（包含 data 字段）
+	if dataField, ok := reqBody["data"].(map[string]interface{}); ok {
+		// VueCMF 格式: {"data": {"login_name": "...", "password": "..."}}
+		if loginName, ok := dataField["login_name"].(string); ok {
+			username = loginName
+		}
+		if pwd, ok := dataField["password"].(string); ok {
+			password = pwd
+		}
+	} else {
+		// 标准格式: {"username": "...", "password": "..."}
+		if u, ok := reqBody["username"].(string); ok {
+			username = u
+		}
+		if p, ok := reqBody["password"].(string); ok {
+			password = p
+		}
+	}
+
+	if username == "" || password == "" {
 		api.writeErrorResponse(w, response.Error(response.CodeInvalidParams, "Username and password are required"))
 		return
 	}
 
-	result, err := api.authSystem.Authenticate(req.Username, req.Password)
+	result, err := api.authSystem.Authenticate(username, password)
 	if err != nil {
 		api.writeErrorResponse(w, response.Error(response.CodeInternalError, err.Error()))
 		return
@@ -92,17 +113,56 @@ func (api *UnifiedAuthAPI) handleLogin(w http.ResponseWriter, r *http.Request) {
 		map[bool]string{true: "success", false: "failed"}[result.Success],
 		getClientIP(r), getUserAgent(r))
 
-	// 构建标准响应格式
+	// 构建 VueCMF 兼容的响应格式
 	if result.Success && result.User != nil {
+		// 获取客户端IP
+		clientIP := getClientIP(r)
+		
+		// 格式化最后登录时间
+		var lastLoginTime string
+		if result.User.LastLogin != nil {
+			lastLoginTime = result.User.LastLogin.Format("2006-01-02 15:04:05")
+		} else {
+			lastLoginTime = ""
+		}
+		
+		// VueCMF 期望的用户对象（包含完整的登录信息）
+		userObj := map[string]interface{}{
+			"id":              result.User.ID,
+			"username":        result.User.Username,
+			"email":           result.User.Email,
+			"phone":           result.User.Phone,
+			"status":          result.User.Status,
+			"role":            result.User.Role,            // 关键！VueCMF 前端需要这个字段
+			"last_login_ip":   clientIP,                    // 最后登录IP
+			"last_login_time": lastLoginTime,               // 最后登录时间
+		}
+		
+		// VueCMF 期望的服务器信息（字段名必须与前端 Welcome.vue 匹配）
+		serverObj := map[string]interface{}{
+			"name":             "Zervigo MVP",
+			"version":          "1.0.0",
+			"os":               "macOS (darwin)",           // 服务器运行环境的操作系统部分
+			"software":         "Go + Gin",                 // 服务器运行环境的软件部分
+			"mysql":            "PostgreSQL 14.19",         // 前端显示"mysql"标签，但我们填PostgreSQL版本
+			"upload_max_size":  "10MB",                     // 最大上传文件大小
+		}
+		
+		// VueCMF 期望的完整登录数据
 		loginData := map[string]interface{}{
+			"token":  result.Token,      // VueCMF 期望 token 字段
+			"user":   userObj,            // VueCMF 期望 user 对象
+			"server": serverObj,          // VueCMF 期望 server 对象
+			
+			// 同时保留原有字段以保持兼容性
 			"userId":       result.User.ID,
 			"userName":     result.User.Username,
 			"userPhone":    result.User.Phone,
-			"userAvatar":   nil, // 暂时设为nil，后续可以从资源服务获取
+			"userAvatar":   nil,
 			"userStatus":   result.User.Status,
 			"loginStatus":  api.calculateLoginStatus(api.getUserStatusInt(result.User.Status)),
 			"accessToken":  result.Token,
-			"refreshToken": "", // 暂时为空，后续可以生成
+			"refreshToken": "",
 		}
 		api.writeSuccessResponse(w, response.Success("登录成功", loginData))
 	} else {
@@ -115,6 +175,45 @@ func (api *UnifiedAuthAPI) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 		api.writeErrorResponse(w, response.Error(errorCode, result.Error))
 	}
+}
+
+// handleLogout 处理登出请求
+func (api *UnifiedAuthAPI) handleLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		api.writeErrorResponse(w, response.Error(response.CodeInvalidParams, "Method not allowed"))
+		return
+	}
+
+	var req struct {
+		Token  string `json:"token"`
+		Data   map[string]interface{} `json:"data"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		api.writeErrorResponse(w, response.Error(response.CodeInvalidParams, "Invalid JSON"))
+		return
+	}
+
+	// 如果 token 在 data 中
+	if req.Token == "" && req.Data != nil {
+		if tokenVal, ok := req.Data["token"].(string); ok {
+			req.Token = tokenVal
+		}
+	}
+
+	// 记录登出日志
+	if req.Token != "" {
+		// 验证 token 获取用户信息
+		result, _ := api.authSystem.ValidateJWT(req.Token)
+		if result != nil && result.Success && result.User != nil {
+			api.authSystem.logAccess(result.User.ID, "logout", "auth", "success", getClientIP(r), getUserAgent(r))
+		}
+	}
+
+	// 返回成功（VueCMF 格式）
+	api.writeSuccessResponse(w, response.Success("登出成功", map[string]interface{}{
+		"message": "已成功登出",
+	}))
 }
 
 // handleValidateJWT 处理JWT验证请求

@@ -1,0 +1,29 @@
+===============================================
+🔧 登录成功后在控制台立即执行
+===============================================
+
+如果登录后出现路由警告，立即在控制台执行：
+
+console.clear();
+console.log('🔧 登录后修复路由\n');
+
+// 强制重新加载菜单和路由
+import LayoutService from '@/service/LayoutService';
+const layoutService = new LayoutService();
+
+layoutService.loadMenu().then(() => {
+  console.log('✅ 路由已重新加载');
+  console.log('现在可以点击菜单了');
+}).catch(err => {
+  console.error('❌ 加载失败:', err);
+  console.log('尝试刷新页面...');
+  setTimeout(() => location.reload(), 2000);
+});
+
+===============================================
+或者最简单的方法：
+
+登录后立即刷新一次页面（Cmd+R 或 F5）
+这样可以确保路由正确加载。
+
+===============================================

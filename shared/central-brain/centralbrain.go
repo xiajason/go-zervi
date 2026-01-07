@@ -42,6 +42,11 @@ type CentralBrain struct {
 	serviceToken           string       // 缓存的服务token
 	serviceTokenExp        time.Time    // token过期时间
 	tokenRefreshInProgress bool         // 标记是否正在刷新token（防止并发刷新）
+
+	// VueCMF 集成
+	vuecmfHandler *VueCMFHandler      // VueCMF 处理器
+	crudHandler   *VueCMFCRUDHandler  // VueCMF CRUD处理器
+	modelHandler  *VueCMFModelHandler // VueCMF 模型配置处理器
 }
 
 // ServiceProxy 服务代理配置
@@ -101,6 +106,33 @@ func NewCentralBrain(config *shared.Config) *CentralBrain {
 	// 初始化Permission Service客户端
 	permissionClient := permission.NewPermissionClient(permissionServiceURL)
 
+	// 初始化 VueCMF 处理器
+	vuecmfConfig := map[string]string{
+		"DB_HOST":     config.Database.PostgreSQL.Host,
+		"DB_PORT":     fmt.Sprintf("%d", config.Database.PostgreSQL.Port),
+		"DB_NAME":     config.Database.PostgreSQL.Database,
+		"DB_USER":     config.Database.PostgreSQL.User,
+		"DB_PASSWORD": config.Database.PostgreSQL.Password,
+		"REDIS_ADDR":  fmt.Sprintf("%s:%d", config.Database.Redis.Host, config.Database.Redis.Port),
+	}
+	vuecmfHandler, err := NewVueCMFHandler(vuecmfConfig)
+	if err != nil {
+		fmt.Printf("⚠️  VueCMF 处理器初始化失败（将不使用 VueCMF 功能）: %v\n", err)
+		vuecmfHandler = nil
+	} else {
+		fmt.Printf("✅ VueCMF 处理器初始化成功\n")
+	}
+
+	// 初始化 VueCMF CRUD 处理器（复用数据库连接）
+	var crudHandler *VueCMFCRUDHandler
+	var modelHandler *VueCMFModelHandler
+	if vuecmfHandler != nil && vuecmfHandler.db != nil {
+		crudHandler = NewVueCMFCRUDHandler(vuecmfHandler.db)
+		modelHandler = NewVueCMFModelHandler(vuecmfHandler.db)
+		fmt.Printf("✅ VueCMF CRUD 处理器初始化成功\n")
+		fmt.Printf("✅ VueCMF 模型配置处理器初始化成功\n")
+	}
+
 	// 初始化中间件
 	requestLogger := middleware.NewRequestLogger(true) // 启用日志
 	metrics := middleware.NewMetrics()
@@ -129,6 +161,9 @@ func NewCentralBrain(config *shared.Config) *CentralBrain {
 		metrics:          metrics,
 		rateLimiter:      rateLimiter,
 		circuitBreakers:  circuitBreakers,
+		vuecmfHandler:    vuecmfHandler,
+		crudHandler:      crudHandler,
+		modelHandler:     modelHandler,
 	}
 
 	// 启动时获取服务token（带重试机制）
@@ -141,9 +176,15 @@ func NewCentralBrain(config *shared.Config) *CentralBrain {
 func (cb *CentralBrain) Start() error {
 	// 配置CORS（必须在最前面）
 	cb.router.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		origin := c.Request.Header.Get("Origin")
+		if origin == "" {
+			origin = "*"
+		}
+		// 修复：当 withCredentials=true 时，不能使用 *，必须指定具体域名
+		c.Header("Access-Control-Allow-Origin", origin)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, accessToken")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, accessToken, token")
+		c.Header("Access-Control-Allow-Credentials", "true")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -164,6 +205,9 @@ func (cb *CentralBrain) Start() error {
 	// 注册管理API（健康检查、指标查询）
 	cb.registerManagementRoutes()
 
+	// 注册 VueCMF API 映射端点
+	cb.registerVueCMFRoutes()
+
 	return cb.router.Run(fmt.Sprintf(":%d", cb.config.CentralBrainPort))
 }
 
@@ -179,6 +223,62 @@ func (cb *CentralBrain) registerManagementRoutes() {
 	cb.router.GET("/api/v1/circuit-breakers", cb.getCircuitBreakers)
 
 	// Router和Permission服务通过代理提供API，不需要单独注册管理路由
+}
+
+// registerVueCMFRoutes 注册 VueCMF API 映射路由
+func (cb *CentralBrain) registerVueCMFRoutes() {
+	if cb.vuecmfHandler == nil {
+		return
+	}
+
+	// API 映射端点（VueCMF 核心功能）
+	cb.router.POST("/api/v1/mapping/get_api_map", cb.vuecmfHandler.GetAPIMap)
+
+	// 调试端点
+	cb.router.GET("/api/v1/mapping/debug", cb.vuecmfHandler.GetAllMappings)
+	cb.router.POST("/api/v1/mapping/clear-cache", cb.vuecmfHandler.ClearCache)
+
+	// 菜单路由（同时支持 GET 和 POST 方法）
+	cb.router.GET("/api/v1/menu/nav", cb.vuecmfHandler.GetMenuNav)
+	cb.router.POST("/api/v1/menu/nav", cb.vuecmfHandler.GetMenuNav)  // VueCMF 使用 POST
+	cb.router.GET("/api/v1/menu/list", cb.vuecmfHandler.GetMenuNav)
+	cb.router.POST("/api/v1/menu/list", cb.vuecmfHandler.GetMenuNav)
+	
+	// VueCMF CRUD 路由（用户、角色、权限管理）
+	if cb.crudHandler != nil {
+		// 支持两种路由格式：
+		// 1. /api/v1/:table/:action (RESTful)
+		// 2. /api/v1/:table (根据请求体的action字段)
+		
+		// 用户管理 API
+		cb.router.POST("/api/v1/admin/index", cb.crudHandler.HandleAction)
+		cb.router.POST("/api/v1/admin/save", cb.crudHandler.HandleAction)
+		cb.router.POST("/api/v1/admin/delete", cb.crudHandler.HandleAction)
+		cb.router.POST("/api/v1/admin", cb.crudHandler.HandleAction)
+		
+		// 角色管理 API
+		cb.router.POST("/api/v1/roles/index", cb.crudHandler.HandleAction)
+		cb.router.POST("/api/v1/roles/save", cb.crudHandler.HandleAction)
+		cb.router.POST("/api/v1/roles/delete", cb.crudHandler.HandleAction)
+		cb.router.POST("/api/v1/roles", cb.crudHandler.HandleAction)
+		
+		// 权限管理 API
+		cb.router.POST("/api/v1/permissions/index", cb.crudHandler.HandleAction)
+		cb.router.POST("/api/v1/permissions/save", cb.crudHandler.HandleAction)
+		cb.router.POST("/api/v1/permissions/delete", cb.crudHandler.HandleAction)
+		cb.router.POST("/api/v1/permissions", cb.crudHandler.HandleAction)
+	}
+	
+	// VueCMF 模型配置 API
+	if cb.modelHandler != nil {
+		cb.router.POST("/api/v1/model_config/index", cb.modelHandler.GetModelConfig)
+		cb.router.POST("/api/v1/model_field/index", cb.modelHandler.GetModelField)
+	}
+	
+	// 测试页面（用于调试）
+	cb.router.StaticFile("/test-login.html", "/Users/szjason72/gozervi/zervigo.demo/test-login.html")
+	cb.router.StaticFile("/test-vuecmf-api.html", "/Users/szjason72/gozervi/zervigo.demo/test-vuecmf-api.html")
+	cb.router.StaticFile("/test-vuecmf-flow.html", "/Users/szjason72/gozervi/zervigo.demo/test-vuecmf-flow.html")
 }
 
 // registerServiceProxies 注册服务代理

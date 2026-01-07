@@ -12,6 +12,8 @@ import (
 	"github.com/go-redis/redis/v8"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // DatabaseChecker 数据库检查器
@@ -69,6 +71,8 @@ func (dc *DatabaseChecker) CheckDatabase() (*DatabaseCheckResult, error) {
 		err = dc.checkMySQL(result)
 	case "redis":
 		err = dc.checkRedis(result)
+	case "mongodb":
+		err = dc.checkMongoDB(result)
 	default:
 		result.Status = "unsupported"
 		result.Message = fmt.Sprintf("不支持的数据库类型: %s", result.Type)
@@ -97,19 +101,27 @@ func (dc *DatabaseChecker) identifyDatabaseType() string {
 		if strings.HasPrefix(url, "redis://") {
 			return "redis"
 		}
+		if strings.HasPrefix(url, "mongodb://") || strings.HasPrefix(url, "mongodb+srv://") {
+			return "mongodb"
+		}
 	}
 
-	// 2. 检查MySQL配置（优先于PostgreSQL）
+	// 2. 检查MongoDB配置（优先检查）
+	if config.MongoDB.Enabled && config.MongoDB.URL != "" {
+		return "mongodb"
+	}
+
+	// 3. 检查MySQL配置（优先于PostgreSQL）
 	if config.MySQL.Enabled && config.MySQL.Host != "" {
 		return "mysql"
 	}
 
-	// 3. 检查PostgreSQL配置
+	// 4. 检查PostgreSQL配置
 	if config.PostgreSQL.Enabled && config.PostgreSQL.Host != "" {
 		return "postgresql"
 	}
 
-	// 4. 检查Redis配置
+	// 5. 检查Redis配置
 	if config.Redis.Enabled && config.Redis.Host != "" {
 		return "redis"
 	}
@@ -426,6 +438,112 @@ func (dc *DatabaseChecker) checkMySQL(result *DatabaseCheckResult) error {
 	return nil
 }
 
+// checkMongoDB 检查MongoDB连接
+func (dc *DatabaseChecker) checkMongoDB(result *DatabaseCheckResult) error {
+	mongoConfig := dc.config.Database.MongoDB
+
+	// 记录配置信息
+	result.Config = map[string]interface{}{
+		"url":      mongoConfig.URL,
+		"database": mongoConfig.Database,
+	}
+
+	// 验证配置完整性
+	if mongoConfig.URL == "" {
+		result.Status = "invalid_config"
+		result.Message = "MongoDB配置不完整: URL未设置"
+		result.Errors = append(result.Errors, result.Message)
+		return fmt.Errorf(result.Message)
+	}
+
+	if mongoConfig.Database == "" {
+		result.Status = "invalid_config"
+		result.Message = "MongoDB配置不完整: DATABASE未设置"
+		result.Errors = append(result.Errors, result.Message)
+		return fmt.Errorf(result.Message)
+	}
+
+	// 尝试连接（带重试）
+	maxRetries := dc.config.DatabaseCheck.RetryCount
+	if maxRetries <= 0 {
+		maxRetries = 1
+	}
+
+	var client *mongo.Client
+	var err error
+
+	for i := 0; i < maxRetries; i++ {
+		if i > 0 {
+			time.Sleep(time.Duration(dc.config.DatabaseCheck.RetryDelay) * time.Second)
+			dc.logger.Printf("重试连接MongoDB (%d/%d)...", i+1, maxRetries)
+		}
+
+		// 设置超时
+		timeout := time.Duration(dc.config.DatabaseCheck.Timeout) * time.Second
+		if timeout <= 0 {
+			timeout = 10 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+
+		// 创建客户端选项
+		clientOptions := options.Client().ApplyURI(mongoConfig.URL)
+		clientOptions.ConnectTimeout = &timeout
+
+		// 连接MongoDB
+		client, err = mongo.Connect(ctx, clientOptions)
+		cancel()
+
+		if err != nil {
+			result.Status = "connection_failed"
+			result.Message = fmt.Sprintf("MongoDB连接失败: %v", err)
+			result.Errors = append(result.Errors, result.Message)
+			if i < maxRetries-1 {
+				continue // 继续重试
+			}
+			return fmt.Errorf(result.Message)
+		}
+
+		// Ping测试
+		pingCtx, pingCancel := context.WithTimeout(context.Background(), timeout)
+		err = client.Ping(pingCtx, nil)
+		pingCancel()
+
+		if err != nil {
+			client.Disconnect(context.Background())
+			result.Status = "ping_failed"
+			result.Message = fmt.Sprintf("MongoDB Ping失败: %v", err)
+			result.Errors = append(result.Errors, result.Message)
+			if i < maxRetries-1 {
+				continue // 继续重试
+			}
+			return fmt.Errorf(result.Message)
+		}
+
+		// 获取数据库版本信息
+		versionCtx, versionCancel := context.WithTimeout(context.Background(), timeout)
+		var serverStatus map[string]interface{}
+		err = client.Database("admin").RunCommand(versionCtx, map[string]interface{}{"buildInfo": 1}).Decode(&serverStatus)
+		versionCancel()
+
+		if err == nil {
+			if version, ok := serverStatus["version"].(string); ok {
+				result.Message = fmt.Sprintf("MongoDB连接成功: %s", version)
+			} else {
+				result.Message = "MongoDB连接成功"
+			}
+		} else {
+			result.Message = "MongoDB连接成功"
+		}
+
+		// 关闭连接
+		client.Disconnect(context.Background())
+		break
+	}
+
+	result.Status = "connected"
+	return nil
+}
+
 // FormatDatabaseError 格式化数据库错误信息
 func FormatDatabaseError(result *DatabaseCheckResult) string {
 	var buf strings.Builder
@@ -476,6 +594,12 @@ func FormatDatabaseError(result *DatabaseCheckResult) string {
 		buf.WriteString("  2. 检查环境变量: REDIS_HOST, REDIS_PORT\n")
 		buf.WriteString("  3. 检查网络连接和防火墙设置\n")
 		buf.WriteString("  4. 验证Redis密码是否正确\n")
+	case "mongodb":
+		buf.WriteString("  1. 检查MongoDB服务是否运行\n")
+		buf.WriteString("  2. 检查环境变量: MONGODB_URL, MONGODB_DATABASE\n")
+		buf.WriteString("  3. 检查网络连接和防火墙设置\n")
+		buf.WriteString("  4. 验证MongoDB连接字符串格式是否正确\n")
+		buf.WriteString("  5. 检查MongoDB认证信息（如需要）\n")
 	}
 
 	buf.WriteString("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")

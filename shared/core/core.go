@@ -169,6 +169,13 @@ func NewCore(configPath string) (*Core, error) {
 			Password: "password",
 			Database: "neo4j",
 		},
+		MongoDB: database.MongoDBConfig{
+			URL:            getEnvString("MONGODB_URL", ""),
+			Database:       getEnvString("MONGODB_DATABASE", ""),
+			ConnectTimeout: parseDuration("10s"),
+			MaxPoolSize:    100,
+			MinPoolSize:    10,
+		},
 	}
 
 	dbManager, err := database.NewManager(dbConfig)

@@ -1,0 +1,26 @@
+# 通用Go微服务开发环境 Dockerfile
+FROM golang:1.25-alpine AS development
+
+# 安装开发工具
+RUN apk add --no-cache git air
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制go mod文件
+COPY go.mod go.sum ./
+
+# 下载依赖
+RUN go mod download
+
+# 安装air热重载工具
+RUN go install github.com/cosmtrek/air@latest
+
+# 复制源码
+COPY . .
+
+# 暴露端口
+EXPOSE 8088
+
+# 使用air进行热重载开发
+CMD ["air", "-c", ".air.toml"]
