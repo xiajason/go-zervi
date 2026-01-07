@@ -21,6 +21,8 @@ type CompanyInfo struct {
 
 // Job 数据模型映射 zervigo_jobs 表
 type Job struct {
+	// 嵌入BaseModel（包含tenant_id, created_at, updated_at, deleted_at）
+	TenantID           int64          `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	ID                 uint           `json:"id" gorm:"primaryKey"`
 	Title              string         `json:"title" gorm:"size:200;not null"`
 	Description        string         `json:"description" gorm:"type:text;not null"`
@@ -66,6 +68,7 @@ func (Job) TableName() string {
 
 // JobApplication 映射职位申请表
 type JobApplication struct {
+	TenantID          int64      `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	ID                uint       `json:"id" gorm:"primaryKey"`
 	JobID             uint       `json:"jobId" gorm:"column:job_id;not null"`
 	UserID            uint       `json:"userId" gorm:"column:user_id;not null"`

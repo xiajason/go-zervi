@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	tenantcontext "github.com/szjason72/zervigo/shared/core/context"
 	"gorm.io/gorm"
 )
 
@@ -31,11 +32,17 @@ func NewCompanyDataSyncService(mysqlDB *gorm.DB, postgresDB *gorm.DB, neo4jDrive
 	}
 }
 
-// SyncCompanyData 同步企业数据到所有数据库
-func (s *CompanyDataSyncService) SyncCompanyData(companyID uint) error {
-	// 1. 从MySQL获取核心企业数据
+// SyncCompanyData 同步企业数据到所有数据库（需要传入context以获取租户ID）
+func (s *CompanyDataSyncService) SyncCompanyData(ctx context.Context, companyID uint) error {
+	// 从context获取租户ID
+	tenantID, err := tenantcontext.GetTenantID(ctx)
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
+	// 1. 从MySQL获取核心企业数据（添加租户过滤）
 	var company EnhancedCompany
-	if err := s.mysqlDB.Preload("CompanyUsers").First(&company, companyID).Error; err != nil {
+	if err := s.mysqlDB.WithContext(ctx).Where("id = ? AND tenant_id = ?", companyID, tenantID).Preload("CompanyUsers").First(&company).Error; err != nil {
 		return fmt.Errorf("获取企业数据失败: %v", err)
 	}
 
@@ -487,9 +494,15 @@ func (s *CompanyDataSyncService) CheckDataConsistency(companyID uint) error {
 }
 
 // GetSyncStatus 获取同步状态
-func (s *CompanyDataSyncService) GetSyncStatus(companyID uint) ([]CompanySyncInfo, error) {
+func (s *CompanyDataSyncService) GetSyncStatus(ctx context.Context, companyID uint) ([]CompanySyncInfo, error) {
+	// 从context获取租户ID
+	tenantID, err := tenantcontext.GetTenantID(ctx)
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
+
 	var syncStatuses []CompanyDataSyncStatus
-	if err := s.mysqlDB.Where("company_id = ?", companyID).Find(&syncStatuses).Error; err != nil {
+	if err := s.mysqlDB.WithContext(ctx).Where("company_id = ? AND tenant_id = ?", companyID, tenantID).Find(&syncStatuses).Error; err != nil {
 		return nil, fmt.Errorf("获取同步状态失败: %v", err)
 	}
 
@@ -509,7 +522,12 @@ func (s *CompanyDataSyncService) GetSyncStatus(companyID uint) ([]CompanySyncInf
 }
 
 // GetCompanyRelationships 获取企业关系
-func (s *CompanyDataSyncService) GetCompanyRelationships(companyID uint) ([]CompanyRelationship, error) {
+func (s *CompanyDataSyncService) GetCompanyRelationships(ctx context.Context, companyID uint) ([]CompanyRelationship, error) {
+	// 从context获取租户ID
+	tenantID, err := tenantcontext.GetTenantID(ctx)
+	if err != nil {
+		tenantID = 1 // 默认租户
+	}
 	if s.neo4jDriver == nil {
 		return nil, fmt.Errorf("Neo4j未连接，无法获取关系")
 	}

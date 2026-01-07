@@ -8,6 +8,7 @@ import (
 // EnhancedCompany 增强的企业模型 - 支持认证机制和地理位置
 type EnhancedCompany struct {
 	ID          uint   `json:"id" gorm:"primaryKey"`
+	TenantID    int64  `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	Name        string `json:"name" gorm:"size:200;not null"`
 	ShortName   string `json:"short_name" gorm:"size:100"`
 	LogoURL     string `json:"logo_url" gorm:"size:500"`
@@ -61,6 +62,7 @@ type EnhancedCompany struct {
 // CompanyUser 企业用户关联模型
 type CompanyUser struct {
 	ID          uint      `json:"id" gorm:"primaryKey"`
+	TenantID    int64     `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	CompanyID   uint      `json:"company_id" gorm:"not null"`
 	UserID      uint      `json:"user_id" gorm:"not null"`
 	Role        string    `json:"role" gorm:"size:50;not null"`         // legal_rep, authorized_user, admin
@@ -77,6 +79,7 @@ type CompanyUser struct {
 // CompanyPermissionAuditLog 企业权限审计日志
 type CompanyPermissionAuditLog struct {
 	ID               uint      `json:"id" gorm:"primaryKey"`
+	TenantID         int64     `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	CompanyID        uint      `json:"company_id" gorm:"not null"`
 	UserID           uint      `json:"user_id" gorm:"not null"`
 	Action           string    `json:"action" gorm:"size:100;not null"`       // 操作类型

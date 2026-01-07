@@ -1,0 +1,268 @@
+version: '3.8'
+
+# ============================================
+# GoZervi 本地云部署配置
+# 完全离线部署，所有资源本地化
+# ============================================
+
+services:
+  # ==================== 基础设施层 ====================
+  
+  # PostgreSQL数据库
+  postgresql:
+    image: postgres:14-alpine
+    container_name: zervigo-postgresql-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zervigo_mvp}
+      POSTGRES_USER: ${POSTGRES_USER:-zervigo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zervigo2025}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      TZ: ${TZ:-Asia/Shanghai}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../databases/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - zervigo-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zervigo} -d ${POSTGRES_DB:-zervigo_mvp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: zervigo-redis-local
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-zervigo2025}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - zervigo-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-zervigo2025}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Consul服务发现
+  consul:
+    image: consul:1.16
+    container_name: zervigo-consul-local
+    restart: unless-stopped
+    command: consul agent -dev -client=0.0.0.0 -ui
+    ports:
+      - "${CONSUL_PORT:-8500}:8500"
+    volumes:
+      - consul_data:/consul/data
+    networks:
+      - zervigo-network
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==================== 核心服务层 ====================
+  
+  # 认证服务
+  auth-service:
+    build:
+      context: ..
+      dockerfile: services/core/auth/Dockerfile.dev
+    container_name: zervigo-auth-service-local
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-zervigo}:${POSTGRES_PASSWORD:-zervigo2025}@postgresql:5432/${POSTGRES_DB:-zervigo_mvp}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-zervigo-mvp-secret-key-2025}
+      AUTH_SERVICE_PORT: 8207
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      COOKIE_MAX_AGE: ${COOKIE_MAX_AGE:-604800}
+    ports:
+      - "${AUTH_SERVICE_PORT:-8207}:8207"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    networks:
+      - zervigo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8207/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 租户服务
+  tenant-service:
+    build:
+      context: ..
+      dockerfile: services/core/tenant/Dockerfile
+    container_name: zervigo-tenant-service-local
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-zervigo}:${POSTGRES_PASSWORD:-zervigo2025}@postgresql:5432/${POSTGRES_DB:-zervigo_mvp}?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-service:8207
+      TENANT_SERVICE_PORT: 8088
+      CONSUL_ADDR: consul:8500
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+    ports:
+      - "${TENANT_SERVICE_PORT:-8088}:8088"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - zervigo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 用户服务
+  user-service:
+    build:
+      context: ..
+      dockerfile: services/core/user/Dockerfile.dev
+    container_name: zervigo-user-service-local
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-zervigo}:${POSTGRES_PASSWORD:-zervigo2025}@postgresql:5432/${POSTGRES_DB:-zervigo_mvp}?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-service:8207
+      USER_SERVICE_PORT: 8082
+      CONSUL_ADDR: consul:8500
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+    ports:
+      - "${USER_SERVICE_PORT:-8082}:8082"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - zervigo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==================== 业务服务层 ====================
+  
+  # 职位服务
+  job-service:
+    build:
+      context: ..
+      dockerfile: services/business/job/Dockerfile.dev
+    container_name: zervigo-job-service-local
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-zervigo}:${POSTGRES_PASSWORD:-zervigo2025}@postgresql:5432/${POSTGRES_DB:-zervigo_mvp}?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-service:8207
+      JOB_SERVICE_PORT: 8084
+      CONSUL_ADDR: consul:8500
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+    ports:
+      - "${JOB_SERVICE_PORT:-8084}:8084"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - zervigo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 企业服务
+  company-service:
+    build:
+      context: ..
+      dockerfile: services/business/company/Dockerfile.dev
+    container_name: zervigo-company-service-local
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-zervigo}:${POSTGRES_PASSWORD:-zervigo2025}@postgresql:5432/${POSTGRES_DB:-zervigo_mvp}?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-service:8207
+      COMPANY_SERVICE_PORT: 8083
+      CONSUL_ADDR: consul:8500
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+    ports:
+      - "${COMPANY_SERVICE_PORT:-8083}:8083"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+    networks:
+      - zervigo-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==================== API网关层 ====================
+  
+  # API网关（可选，如果需要统一入口）
+  # api-gateway:
+  #   build:
+  #     context: ..
+  #     dockerfile: services/gateway/Dockerfile
+  #   container_name: zervigo-api-gateway-local
+  #   restart: unless-stopped
+  #   environment:
+  #     CONSUL_ADDR: consul:8500
+  #     AUTH_SERVICE_URL: http://auth-service:8207
+  #     GATEWAY_PORT: 9000
+  #   ports:
+  #     - "${GATEWAY_PORT:-9000}:9000"
+  #   depends_on:
+  #     consul:
+  #       condition: service_healthy
+  #     auth-service:
+  #       condition: service_healthy
+  #   networks:
+  #     - zervigo-network
+
+# ==================== 数据卷 ====================
+volumes:
+  postgres_data:
+    driver: local
+    name: zervigo_postgres_local
+  redis_data:
+    driver: local
+    name: zervigo_redis_local
+  consul_data:
+    driver: local
+    name: zervigo_consul_local
+
+# ==================== 网络 ====================
+networks:
+  zervigo-network:
+    driver: bridge
+    name: zervigo_local_network
+

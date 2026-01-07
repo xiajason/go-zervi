@@ -7,6 +7,7 @@ import (
 // CompanyProfileBasicInfo 企业画像基本信息表
 type CompanyProfileBasicInfo struct {
 	ID                      uint       `json:"id" gorm:"primaryKey"`
+	TenantID                int64      `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	CompanyID               uint       `json:"company_id" gorm:"not null"`
 	ReportID                string     `json:"report_id" gorm:"size:50;uniqueIndex"`
 	CompanyName             string     `json:"company_name" gorm:"size:255;not null"`
@@ -31,6 +32,7 @@ type CompanyProfileBasicInfo struct {
 // QualificationLicense 资质许可表
 type QualificationLicense struct {
 	ID                uint       `json:"id" gorm:"primaryKey"`
+	TenantID          int64      `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	CompanyID         uint       `json:"company_id" gorm:"not null"`
 	ReportID          string     `json:"report_id" gorm:"size:50"`
 	Type              string     `json:"type" gorm:"type:enum('资质','许可','备案');not null"`
@@ -48,6 +50,7 @@ type QualificationLicense struct {
 // PersonnelCompetitiveness 人员竞争力表
 type PersonnelCompetitiveness struct {
 	ID                   uint       `json:"id" gorm:"primaryKey"`
+	TenantID             int64      `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	CompanyID            uint       `json:"company_id" gorm:"not null"`
 	ReportID             string     `json:"report_id" gorm:"size:50"`
 	DataUpdateDate       *time.Time `json:"data_update_date"`
@@ -64,6 +67,7 @@ type PersonnelCompetitiveness struct {
 // ProvidentFund 公积金信息表
 type ProvidentFund struct {
 	ID               uint       `json:"id" gorm:"primaryKey"`
+	TenantID         int64      `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	CompanyID        uint       `json:"company_id" gorm:"not null"`
 	ReportID         string     `json:"report_id" gorm:"size:50"`
 	UnitNature       string     `json:"unit_nature" gorm:"size:100"`
@@ -78,6 +82,7 @@ type ProvidentFund struct {
 // SubsidyInfo 资助补贴表
 type SubsidyInfo struct {
 	ID          uint      `json:"id" gorm:"primaryKey"`
+	TenantID    int64     `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	CompanyID   uint      `json:"company_id" gorm:"not null"`
 	ReportID    string    `json:"report_id" gorm:"size:50"`
 	SubsidyYear int       `json:"subsidy_year"`
@@ -92,6 +97,7 @@ type SubsidyInfo struct {
 // CompanyRelationship 企业关系图谱表
 type CompanyRelationship struct {
 	ID                 uint      `json:"id" gorm:"primaryKey"`
+	TenantID           int64     `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	CompanyID          uint      `json:"company_id" gorm:"not null"`
 	ReportID           string    `json:"report_id" gorm:"size:50"`
 	RelatedCompanyName string    `json:"related_company_name" gorm:"size:255"`
@@ -106,6 +112,7 @@ type CompanyRelationship struct {
 // TechInnovationScore 科创评分表
 type TechInnovationScore struct {
 	ID                   uint      `json:"id" gorm:"primaryKey"`
+	TenantID             int64     `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	CompanyID            uint      `json:"company_id" gorm:"not null"`
 	ReportID             string    `json:"report_id" gorm:"size:50"`
 	BasicScore           float64   `json:"basic_score" gorm:"type:decimal(5,2)"`
@@ -120,6 +127,7 @@ type TechInnovationScore struct {
 // CompanyProfileFinancialInfo 企业画像财务信息表
 type CompanyProfileFinancialInfo struct {
 	ID               uint      `json:"id" gorm:"primaryKey"`
+	TenantID         int64     `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	CompanyID        uint      `json:"company_id" gorm:"not null"`
 	ReportID         string    `json:"report_id" gorm:"size:50"`
 	AnnualRevenue    float64   `json:"annual_revenue" gorm:"type:decimal(18,2)"`
@@ -145,6 +153,7 @@ type CompanyProfileFinancialInfo struct {
 // CompanyRiskInfo 企业风险信息表
 type CompanyRiskInfo struct {
 	ID               uint      `json:"id" gorm:"primaryKey"`
+	TenantID         int64     `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	CompanyID        uint      `json:"company_id" gorm:"not null"`
 	ReportID         string    `json:"report_id" gorm:"size:50"`
 	RiskLevel        string    `json:"risk_level" gorm:"type:enum('低风险','中风险','高风险');default:低风险"`
@@ -212,6 +221,7 @@ func (CompanyRiskInfo) TableName() string {
 // CompanyProfileRiskInfo 企业风险信息表
 type CompanyProfileRiskInfo struct {
 	ID               uint      `json:"id" gorm:"primaryKey"`
+	TenantID         int64     `json:"tenant_id" gorm:"column:tenant_id;index;not null;default:1"`
 	CompanyID        uint      `json:"company_id" gorm:"not null"`
 	ReportID         string    `json:"report_id" gorm:"size:50"`
 	RiskLevel        string    `json:"risk_level" gorm:"size:20;default:低风险"`

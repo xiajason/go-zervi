@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/szjason72/zervigo/shared/core"
+	"github.com/szjason72/zervigo/shared/core/context"
 )
 
 // JobData 职位数据模型（PostgreSQL）
@@ -41,15 +42,21 @@ func setupCompanyEnhancedRoutes(r *gin.Engine, core *jobfirst.Core, dataSyncServ
 					return
 				}
 
-				// 获取企业
+				// 从context获取租户ID
+				tenantID, err := context.GetTenantID(c.Request.Context())
+				if err != nil {
+					tenantID = 1 // 默认租户
+				}
+
+				// 获取企业（添加租户过滤）
 				var company EnhancedCompany
-				if err := core.GetDB().First(&company, companyID).Error; err != nil {
+				if err := core.GetDB().Where("id = ? AND tenant_id = ?", companyID, tenantID).First(&company).Error; err != nil {
 					c.JSON(http.StatusNotFound, gin.H{"error": "企业不存在"})
 					return
 				}
 
-				// 同步到所有数据库
-				if err := dataSyncService.SyncCompanyData(uint(companyID)); err != nil {
+				// 同步到所有数据库（传入context）
+				if err := dataSyncService.SyncCompanyData(c.Request.Context(), uint(companyID)); err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "同步失败: " + err.Error()})
 					return
 				}
@@ -75,9 +82,15 @@ func setupCompanyEnhancedRoutes(r *gin.Engine, core *jobfirst.Core, dataSyncServ
 					"sync_status": make(map[string]interface{}),
 				}
 
-				// 检查MySQL状态
+				// 从context获取租户ID
+				tenantID, err := context.GetTenantID(c.Request.Context())
+				if err != nil {
+					tenantID = 1 // 默认租户
+				}
+
+				// 检查MySQL状态（添加租户过滤）
 				var company EnhancedCompany
-				if err := core.GetDB().First(&company, companyID).Error; err == nil {
+				if err := core.GetDB().Where("id = ? AND tenant_id = ?", companyID, tenantID).First(&company).Error; err == nil {
 					status["sync_status"].(map[string]interface{})["mysql"] = map[string]interface{}{
 						"status":       "synced",
 						"last_updated": company.UpdatedAt,
@@ -88,10 +101,10 @@ func setupCompanyEnhancedRoutes(r *gin.Engine, core *jobfirst.Core, dataSyncServ
 					}
 				}
 
-				// 检查PostgreSQL状态
+				// 检查PostgreSQL状态（添加租户过滤）
 				if dataSyncService.postgresDB != nil {
 					var jobData JobData
-					if err := dataSyncService.postgresDB.Where("company_id = ?", companyID).First(&jobData).Error; err == nil {
+					if err := dataSyncService.postgresDB.Where("company_id = ? AND tenant_id = ?", companyID, tenantID).First(&jobData).Error; err == nil {
 						status["sync_status"].(map[string]interface{})["postgresql"] = map[string]interface{}{
 							"status":       "synced",
 							"has_job_data": true,
@@ -109,9 +122,9 @@ func setupCompanyEnhancedRoutes(r *gin.Engine, core *jobfirst.Core, dataSyncServ
 					}
 				}
 
-				// 检查Neo4j状态
+				// 检查Neo4j状态（传入context）
 				if dataSyncService.neo4jDriver != nil {
-					relationships, err := dataSyncService.GetCompanyRelationships(uint(companyID))
+					relationships, err := dataSyncService.GetCompanyRelationships(c.Request.Context(), uint(companyID))
 					if err == nil {
 						status["sync_status"].(map[string]interface{})["neo4j"] = map[string]interface{}{
 							"status":             "synced",
@@ -275,7 +288,7 @@ func setupCompanyEnhancedRoutes(r *gin.Engine, core *jobfirst.Core, dataSyncServ
 					return
 				}
 
-				relationships, err := dataSyncService.GetCompanyRelationships(uint(companyID))
+				relationships, err := dataSyncService.GetCompanyRelationships(c.Request.Context(), uint(companyID))
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "获取企业关系失败: " + err.Error()})
 					return

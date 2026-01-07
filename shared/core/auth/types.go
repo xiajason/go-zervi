@@ -20,11 +20,13 @@ type User struct {
 	SubscriptionStatus    string         `json:"subscription_status" gorm:"column:subscription_status"`
 	SubscriptionType      *string        `json:"subscription_type" gorm:"column:subscription_type"`
 	SubscriptionExpiresAt *time.Time     `json:"subscription_expires_at" gorm:"column:subscription_expires_at"`
+	LastTenantID          *int64          `json:"last_tenant_id" gorm:"column:last_tenant_id"` // 最后使用的租户ID
 	CreatedAt             time.Time      `json:"created_at" gorm:"column:created_at"`
 	UpdatedAt             time.Time      `json:"updated_at" gorm:"column:updated_at"`
-	LastLoginAt           *time.Time     `json:"last_login_at" gorm:"column:last_login_at"`
-	DeletedAt             gorm.DeletedAt `json:"-" gorm:"column:deleted_at"`
-	Role                  string         `json:"role" gorm:"-"`
+	LastLoginAt           *time.Time      `json:"last_login_at" gorm:"column:last_login_at"`
+	DeletedAt             gorm.DeletedAt  `json:"-" gorm:"column:deleted_at"`
+	Role                  string          `json:"role" gorm:"-"`
+	TenantID              int64           `json:"tenant_id" gorm:"-"` // 当前租户ID（从JWT获取，不存储到数据库）
 }
 
 // TableName 指定表名
@@ -73,6 +75,7 @@ type Claims struct {
 	UserID   uint   `json:"user_id"`
 	Username string `json:"username"`
 	Role     string `json:"role"`
+	TenantID int64  `json:"tenant_id"` // 租户ID
 	Exp      int64  `json:"exp"`
 	Iat      int64  `json:"iat"`
 	jwt.RegisteredClaims
